@@ -494,13 +494,15 @@ class ComplianceAgent:
         - Fix attempts ≤ 2.
 
         Otherwise → **use `create_ifc_tool`**.
+        After any `fix_ifc_tool`, you MUST re-run `execute_ifc_tool` to verify success.
 
         ### 3. Mandatory Tool Persistence
-        After a newly created (or fixed) tool executes successfully:
+        After a newly created tool executes successfully:
         - You MUST call `store_ifc_tool` immediately.
         - DO NOT execute another tool.
         - DO NOT continue to the next subgoal.
         - Stored tools become available to `select_ifc_tool` in future sessions.
+        Fix success alone is NOT enough. Only store after `execute_ifc_tool` succeeds.
 
         ### 4. Subgoal Progress Management
         You MUST call `review_and_update_subgoals` when:
@@ -552,9 +554,11 @@ class ComplianceAgent:
         - If correct → proceed.
 
         5. **MANDATORY STORE CHECKPOINT**  
-        If the tool was created in this session and validated:
+        If the tool was created in this session and validated by a successful `execute_ifc_tool`:
         - Call `store_ifc_tool`
         - Then stop; next iteration will continue from the stored tool.
+
+        **If you used `fix_ifc_tool`, return to Step 3 (Execute Tool) and validate before storing.**
 
         6. **MANDATORY SUBGOAL UPDATE CHECKPOINT**  
         If the subgoal is complete or impossible:
