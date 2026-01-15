@@ -15,8 +15,11 @@
             <div id="viewer-overlay">
                 <div class="preview-placeholder" id="preview-placeholder">
                     <i>📁</i>
-                    <div>Drag and drop IFC file here</div>
-                    <div style="font-size: 14px; margin-top: 10px; color: #6c757d;">or click to browse</div>
+                    <div>Upload IFC File</div>
+                    <div class="example-ifc-row">
+                        <span>or</span>
+                        <button id="example-ifc-btn" class="example-ifc-btn" type="button">Use Example IFC Model</button>
+                    </div>
                 </div>
                 <div id="file-info" style="display: none; text-align: center;">
                     <div style="font-size: 48px; margin-bottom: 15px;">✓</div>
@@ -25,6 +28,9 @@
                     <div style="font-size: 12px; color: #999; margin-top: 15px;">Click or drag to change file</div>
                 </div>
             </div>
+            <button id="reupload-btn" class="reupload-btn" style="display: none;">
+                Change File
+            </button>
         </div>
 
         <!-- Right Panel: Form and Results -->
@@ -32,6 +38,10 @@
             <form id="checkForm" enctype="multipart/form-data">
                 <div class="form-group">
                     <textarea id="regulation" name="regulation" placeholder="Enter building code text..." required></textarea>
+                    <div class="example-buttons">
+                        <button type="button" id="example-regulation-btn-1" class="example-btn">Use Example Regulation 1</button>
+                        <button type="button" id="example-regulation-btn-2" class="example-btn">Use Example Regulation 2</button>
+                    </div>
                 </div>
 
                 <input type="file" id="ifc_file" name="ifc_file" accept=".ifc" required style="display: none;">

@@ -8,10 +8,12 @@ Modules:
 - element_queries: Basic element query operations
 - property_queries: Property and property set queries
 - relationship_queries: Relationship and connection queries
-- geometry_queries: Geometric data extraction
+- quantity_queries: Quantity set queries (areas, volumes, dimensions)
+- geometry_queries: Geometric operations (placement, elevation, bounding box, distance)
 """
 
 from .element_queries import *
 from .property_queries import *
 from .relationship_queries import *
+from .quantity_queries import *
 from .geometry_queries import *

@@ -9,70 +9,10 @@ import ifcopenshell
 from typing import List, Optional, Union, Dict, Any
 
 
-def get_spatial_container(element: ifcopenshell.entity_instance) -> Optional[ifcopenshell.entity_instance]:
-    """Get the spatial container (space, storey, building) that contains this element.
-
-    Args:
-        element: IFC element instance
-
-    Returns:
-        Spatial container element or None if not found
-    """
-    if not element or not hasattr(element, 'ContainedInStructure'):
-        return None
-
-    for rel in element.ContainedInStructure:
-        if rel.is_a('IfcRelContainedInSpatialStructure'):
-            return rel.RelatingStructure
-    return None
-
-
-def get_contained_elements(spatial_element: ifcopenshell.entity_instance) -> List[ifcopenshell.entity_instance]:
-    """Get all elements contained in a spatial structure.
-
-    Args:
-        spatial_element: IFC spatial element (IfcSpace, IfcBuildingStorey, etc.)
-
-    Returns:
-        List of contained elements
-    """
-    elements = []
-    if not spatial_element or not hasattr(spatial_element, 'ContainsElements'):
-        return elements
-
-    for rel in spatial_element.ContainsElements:
-        if rel.is_a('IfcRelContainedInSpatialStructure'):
-            elements.extend(rel.RelatedElements)
-    return elements
-
-
-def get_connected_elements(element: ifcopenshell.entity_instance, relation_type: str = None) -> List[ifcopenshell.entity_instance]:
-    """Get elements connected to this element.
-
-    Args:
-        element: IFC element instance
-        relation_type: Specific relationship type filter (optional)
-
-    Returns:
-        List of connected elements
-    """
-    connected = []
-    if not element:
-        return connected
-
-    # Check ConnectedTo relationships
-    if hasattr(element, 'ConnectedTo'):
-        for rel in element.ConnectedTo:
-            if relation_type is None or rel.is_a(relation_type):
-                connected.append(rel.RelatedElement)
-
-    # Check ConnectedFrom relationships
-    if hasattr(element, 'ConnectedFrom'):
-        for rel in element.ConnectedFrom:
-            if relation_type is None or rel.is_a(relation_type):
-                connected.append(rel.RelatingElement)
-
-    return connected
+# Note: get_spatial_container() and get_contained_elements() have been removed
+# as they duplicate ifcopenshell.util.element.get_container() and get_contained().
+# For sandbox execution, these functions are injected directly.
+# For non-sandbox code (like core tools), import ifcopenshell.util.element directly.
 
 
 def get_filling_elements(host_element: ifcopenshell.entity_instance) -> List[ifcopenshell.entity_instance]:
@@ -118,106 +58,6 @@ def get_host_element(filling_element: ifcopenshell.entity_instance) -> Optional[
                     if rel_voids.is_a('IfcRelVoidsElement'):
                         return rel_voids.RelatingBuildingElement
     return None
-
-
-def find_relationship(element1: ifcopenshell.entity_instance,
-                     element2: ifcopenshell.entity_instance,
-                     relationship_type: str = None) -> Optional[ifcopenshell.entity_instance]:
-    """Find relationship between two elements.
-
-    Args:
-        element1: First element
-        element2: Second element
-        relationship_type: Specific relationship type to look for (optional)
-
-    Returns:
-        Relationship instance or None if not found
-    """
-    if not element1 or not element2:
-        return None
-
-    # Check all relationships from element1
-    for attr_name in dir(element1):
-        if attr_name.startswith('_'):
-            continue
-        attr_value = getattr(element1, attr_name)
-        if hasattr(attr_value, '__iter__') and not isinstance(attr_value, str):
-            for rel in attr_value:
-                if hasattr(rel, 'is_a') and rel.is_a().startswith('IfcRel'):
-                    if relationship_type and not rel.is_a(relationship_type):
-                        continue
-
-                    # Check if element2 is in this relationship
-                    for rel_attr_name in dir(rel):
-                        if rel_attr_name.startswith('_'):
-                            continue
-                        rel_attr_value = getattr(rel, rel_attr_name)
-
-                        if rel_attr_value == element2:
-                            return rel
-                        elif hasattr(rel_attr_value, '__iter__') and not isinstance(rel_attr_value, str):
-                            if element2 in rel_attr_value:
-                                return rel
-    return None
-
-
-def get_aggregated_elements(aggregate_element: ifcopenshell.entity_instance) -> List[ifcopenshell.entity_instance]:
-    """Get elements that are aggregated by this element.
-
-    Args:
-        aggregate_element: Element that aggregates others
-
-    Returns:
-        List of aggregated elements
-    """
-    aggregated = []
-    if not aggregate_element or not hasattr(aggregate_element, 'IsDecomposedBy'):
-        return aggregated
-
-    for rel in aggregate_element.IsDecomposedBy:
-        if rel.is_a('IfcRelAggregates'):
-            aggregated.extend(rel.RelatedObjects)
-    return aggregated
-
-
-def get_decomposing_element(element: ifcopenshell.entity_instance) -> Optional[ifcopenshell.entity_instance]:
-    """Get the element that decomposes/aggregates this element.
-
-    Args:
-        element: Element that is part of an aggregation
-
-    Returns:
-        Decomposing element or None if not found
-    """
-    if not element or not hasattr(element, 'Decomposes'):
-        return None
-
-    for rel in element.Decomposes:
-        if rel.is_a('IfcRelAggregates'):
-            return rel.RelatingObject
-    return None
-
-
-def get_assigned_elements(assigning_element: ifcopenshell.entity_instance,
-                         assignment_type: str = None) -> List[ifcopenshell.entity_instance]:
-    """Get elements assigned to this element.
-
-    Args:
-        assigning_element: Element that assigns others
-        assignment_type: Specific assignment type filter (optional)
-
-    Returns:
-        List of assigned elements
-    """
-    assigned = []
-    if not assigning_element or not hasattr(assigning_element, 'HasAssignments'):
-        return assigned
-
-    for rel in assigning_element.HasAssignments:
-        if assignment_type is None or rel.is_a(assignment_type):
-            if hasattr(rel, 'RelatedObjects'):
-                assigned.extend(rel.RelatedObjects)
-    return assigned
 
 
 def get_space_boundaries(ifc_file: ifcopenshell.entity_instance,
@@ -294,6 +134,15 @@ def find_adjacent_spaces_via_boundaries(ifc_file: ifcopenshell.entity_instance,
                                        space: ifcopenshell.entity_instance) -> List[ifcopenshell.entity_instance]:
     """Find spaces adjacent to given space by analyzing shared INTERNAL boundary elements.
 
+    This function uses boundary pairing logic with distance validation:
+    - Two spaces are adjacent if they share the same building element (wall/slab)
+    - For elements shared by exactly 2 spaces: both spaces are adjacent
+    - For elements shared by 3+ spaces: use boundary distance check (< 5 meters)
+      to determine which pairs are truly adjacent
+
+    This approach handles both simple adjacency (2 spaces sharing a wall) and
+    complex cases (multiple spaces along a long corridor wall).
+
     Args:
         ifc_file: IFC file instance
         space: Space to find adjacencies for
@@ -302,29 +151,117 @@ def find_adjacent_spaces_via_boundaries(ifc_file: ifcopenshell.entity_instance,
         List of unique adjacent space instances that share building elements with the input space.
         Returns empty list [] if space has no INTERNAL boundaries or no adjacent spaces found.
     """
-    adjacent_spaces = []
-
-    # Get all boundaries for this space (only internal boundaries indicate adjacency)
+    # Step 1: Get all INTERNAL boundaries for the target space
     space_boundaries = get_space_boundaries(ifc_file, space, 'INTERNAL')
 
-    # Get all building elements that bound this space
-    bounding_elements = []
-    for boundary in space_boundaries:
-        if boundary.RelatedBuildingElement:
-            bounding_elements.append(boundary.RelatedBuildingElement)
+    if not space_boundaries:
+        return []
 
-    # Find other spaces that share these building elements
+    # Step 2: Collect all building elements that bound the target space
+    target_elements = set()
+    for boundary in space_boundaries:
+        element = boundary.RelatedBuildingElement
+        if element:
+            target_elements.add(element)
+
+    if not target_elements:
+        return []
+
+    # Step 3: Get all INTERNAL boundaries in the IFC file and group by element
+    # This creates a mapping: {building_element: [space1, space2, ...]}
     all_boundaries = get_space_boundaries(ifc_file, boundary_type='INTERNAL')
+    element_to_spaces = {}
 
     for boundary in all_boundaries:
-        # Skip boundaries from the same space
-        if boundary.RelatingSpace == space:
-            continue
+        element = boundary.RelatedBuildingElement
+        relating_space = boundary.RelatingSpace
 
-        # Check if this boundary shares a building element with our space
-        if boundary.RelatedBuildingElement in bounding_elements:
-            other_space = boundary.RelatingSpace
-            if other_space and other_space not in adjacent_spaces:
-                adjacent_spaces.append(other_space)
+        if element and relating_space:
+            if element not in element_to_spaces:
+                element_to_spaces[element] = []
+            # Avoid duplicates - each space should appear once per element
+            if relating_space not in element_to_spaces[element]:
+                element_to_spaces[element].append(relating_space)
+
+    # Step 4: Find adjacent spaces using boundary pairing logic with distance validation
+    adjacent_spaces = []
+
+    # Helper function to get boundary location from ConnectionGeometry
+    def get_boundary_location(boundary):
+        """Extract 3D location from boundary's ConnectionGeometry."""
+        try:
+            if boundary.ConnectionGeometry:
+                surface = boundary.ConnectionGeometry.SurfaceOnRelatingElement
+                basis = surface.BasisSurface
+                position = basis.Position
+                if hasattr(position, 'Location') and position.Location:
+                    coords = position.Location.Coordinates
+                    return (coords[0], coords[1], coords[2] if len(coords) > 2 else 0)
+        except:
+            pass
+        return None
+
+    # Helper function to calculate 3D distance
+    def calculate_distance(loc1, loc2):
+        """Calculate Euclidean distance between two 3D points."""
+        import math
+        return math.sqrt(sum((a - b) ** 2 for a, b in zip(loc1, loc2)))
+
+    # Create a mapping of element + space -> boundary for distance checks
+    element_space_boundaries = {}
+    for boundary in all_boundaries:
+        element = boundary.RelatedBuildingElement
+        relating_space = boundary.RelatingSpace
+        if element and relating_space:
+            key = (element, relating_space)
+            element_space_boundaries[key] = boundary
+
+    for element in target_elements:
+        if element in element_to_spaces:
+            spaces_on_element = element_to_spaces[element]
+
+            # Case 1: Element shared by EXACTLY 2 spaces
+            # These are definitely adjacent (simple wall between two rooms)
+            if len(spaces_on_element) == 2 and space in spaces_on_element:
+                other_space = [s for s in spaces_on_element if s != space][0]
+                if other_space not in adjacent_spaces:
+                    adjacent_spaces.append(other_space)
+
+            # Case 2: Element shared by 3+ spaces
+            # Use distance check to determine which are truly adjacent
+            # (e.g., multiple rooms along a long corridor wall)
+            elif len(spaces_on_element) >= 3 and space in spaces_on_element:
+                # Get boundary location for target space
+                target_boundary = element_space_boundaries.get((element, space))
+                if not target_boundary:
+                    continue
+
+                target_location = get_boundary_location(target_boundary)
+                if not target_location:
+                    continue  # Skip if no location data
+
+                # Check distance to each other space on this element
+                DISTANCE_THRESHOLD = 5000.0  # 5 meters in mm
+
+                for other_space in spaces_on_element:
+                    if other_space == space:
+                        continue
+
+                    # Get boundary location for other space
+                    other_boundary = element_space_boundaries.get((element, other_space))
+                    if not other_boundary:
+                        continue
+
+                    other_location = get_boundary_location(other_boundary)
+                    if not other_location:
+                        continue
+
+                    # Calculate distance between boundaries
+                    distance = calculate_distance(target_location, other_location)
+
+                    # If distance is small enough, consider them adjacent
+                    if distance < DISTANCE_THRESHOLD:
+                        if other_space not in adjacent_spaces:
+                            adjacent_spaces.append(other_space)
 
     return adjacent_spaces

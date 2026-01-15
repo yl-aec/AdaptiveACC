@@ -58,7 +58,7 @@ class ToolSelection:
             selected_tool = self.generative_tool_selection(task_description, relevant_tools_metadata)
 
             if selected_tool:
-                tool_name = selected_tool.get('tool_name', 'unknown')
+                tool_name = selected_tool.get('ifc_tool_name', 'unknown')
                 print(f"Phase 2 complete: Selected '{tool_name}'")
                 span.set_attribute("select_ifc_tool.success", True)
                 span.set_attribute("select_ifc_tool.selected_tool_name", tool_name)
@@ -173,6 +173,12 @@ class ToolSelection:
 
             response = self.llm_client.generate_response(user_prompt, system_prompt=system_prompt)
 
+            # Check if LLM returned None
+            if response is None:
+                print(f"LLM returned None when selecting IFC tool")
+                span.set_attribute("llm_selection.failed_response", "None")
+                return None
+
             # Record complete LLM response
             span.set_attribute("llm_response.full_content", str(response))
 
@@ -182,7 +188,7 @@ class ToolSelection:
             if selected_tool_name and selected_tool_name.lower() != "null":
                 # Find the selected tool metadata
                 for tool_metadata in candidate_tools:
-                    if tool_metadata.get('tool_name') == selected_tool_name:
+                    if tool_metadata.get('ifc_tool_name') == selected_tool_name:
                         span.set_attribute("llm_selection.selected_tool", selected_tool_name)
                         return tool_metadata
 
@@ -201,7 +207,7 @@ class ToolSelection:
         formatted_tools = []
 
         for i, tool in enumerate(tools, 1):
-            name = tool.get('tool_name', 'unknown')
+            name = tool.get('ifc_tool_name', 'unknown')
             description = tool.get('description', 'No description')
             parameters = tool.get('parameters', '')
 

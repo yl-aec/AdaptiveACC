@@ -1,3 +1,9 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
     margin: 0;
@@ -10,6 +16,7 @@ body {
 .main-container {
     display: flex;
     height: 100vh;
+    width: 100%;
 }
 
 .left-panel {
@@ -65,6 +72,7 @@ body {
     padding: 15px;
     overflow-y: auto;
     box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    box-sizing: border-box;
 }
 
 .form-group {
@@ -85,6 +93,59 @@ textarea {
 
 textarea:focus {
     border-color: #000;
+}
+
+.example-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.example-btn {
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    width: auto;
+}
+
+.example-btn:hover {
+    background-color: #f0f0f0;
+}
+
+.example-ifc-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.example-ifc-btn {
+    background-color: #444444;
+    color: #ffffff;
+    border: 1px solid #444444;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    width: auto;
+}
+
+.example-ifc-btn:hover {
+    background-color: #3a3a3a;
+    border-color: #3a3a3a;
+}
+
+.example-ifc-btn:disabled {
+    background-color: #888888;
+    border-color: #888888;
+    cursor: not-allowed;
 }
 
 button {
@@ -148,4 +209,689 @@ button:disabled {
 
 .report-card:last-child {
     margin-bottom: 0;
+}
+
+/* Real-time Progress Display Styles */
+.progress-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.step-indicator {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.step {
+    flex: 0 0 auto;
+    text-align: center;
+    position: relative;
+}
+
+.step-connector {
+    flex: 1;
+    height: 2px;
+    background: rgba(255,255,255,0.3);
+    margin: 0 10px;
+}
+
+.step.active ~ .step-connector,
+.step.completed ~ .step-connector {
+    background: rgba(255,255,255,0.6);
+}
+
+.step-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-weight: bold;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+.step.active .step-circle {
+    background: #ffc107;
+    color: #333;
+    border-color: #ffc107;
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(255,193,7,0.5);
+}
+
+.step.completed .step-circle {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.step.completed .step-circle::after {
+    content: '✓';
+    font-size: 24px;
+}
+
+.step-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.9);
+}
+
+/* Subgoal Progress Bar */
+.subgoal-progress-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 18px;
+}
+
+.progress-bar-container {
+    flex: 1;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7fc29b 0%, #52a572 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-bar-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: #4a5568;
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: right;
+}
+
+/* Iteration Container */
+.iteration-container {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.iteration-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.iteration-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.iteration-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.iteration-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Iteration Card */
+.iteration-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: box-shadow 0.2s ease;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.iteration-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.iteration-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.iteration-number {
+    font-weight: 700;
+    font-size: 14px;
+    color: #333;
+    flex-shrink: 0;
+    margin-right: 12px;
+}
+
+/* Iteration Summary Inline */
+.iteration-summary-inline {
+    font-size: 15px;
+    font-weight: 500;
+    color: #4a5568;
+    flex: 1;
+    line-height: 1.5;
+}
+
+/* Iteration Summary (old standalone version - not used) */
+.iteration-summary {
+    font-size: 15px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #667eea;
+    border-radius: 6px;
+    line-height: 1.5;
+}
+
+/* Input Summary Section - Blue theme */
+.input-summary-section {
+    background: #eef5fb;
+    border-left: 4px solid #4a8fc4;
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.input-summary-section .section-label {
+    color: #4a8fc4;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.input-summary-content {
+    margin-top: 5px;
+    color: #1a1a1a;
+}
+
+/* Toggle Buttons */
+.toggle-details-btn {
+    background: transparent;
+    border: 1px solid #d0d0d0;
+    color: #666;
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 10px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+    width: auto;
+}
+
+.toggle-details-btn:hover {
+    background: #f5f5f5;
+    border-color: #999;
+    color: #333;
+}
+
+/* Technical Details Section */
+.technical-details {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 12px;
+}
+
+.detail-section {
+    margin-bottom: 12px;
+}
+
+.detail-section:last-child {
+    margin-bottom: 0;
+}
+
+.detail-section pre {
+    background: white;
+    border: 1px solid #e0e0e0;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+    overflow-x: auto;
+    margin-top: 6px;
+}
+
+/* Friendly Output Styles */
+.friendly-output {
+    padding: 8px 0;
+}
+
+.output-status {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    display: inline-block;
+}
+
+.output-success {
+    background: #e8f5ed;
+    color: #28a745;
+}
+
+.output-error {
+    background: #fdecea;
+    color: #dc3545;
+}
+
+.output-item {
+    font-size: 13px;
+    color: #1a1a1a;
+    padding: 5px 0;
+    line-height: 1.6;
+}
+
+.output-item.error {
+    color: #c9736c;
+    font-weight: 500;
+}
+
+.output-item-detail {
+    font-size: 12px;
+    color: #6c757d;
+    padding: 4px 0 4px 20px;
+    font-family: 'Courier New', monospace;
+}
+
+.subgoal-badge {
+    background: linear-gradient(135deg, #8b9dc9 0%, #9b7db8 100%);
+    color: white;
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* Section Labels */
+.section-label {
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.thought-section .section-label {
+    color: #d88c54;
+}
+
+.action-section .section-label {
+    color: #6ba3d4;
+}
+
+/* Thought Section - Soft Orange */
+.thought-section {
+    background: #faf5ee;
+    border-left: 4px solid #d88c54;
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Action Section - Soft Blue */
+.action-section {
+    background: #f0f6fa;
+    border-left: 4px solid #6ba3d4;
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.action-section code {
+    background: transparent;
+    padding: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #5a7a99;
+}
+
+/* Action Input Section - Soft Green */
+.action-input-section {
+    background: #f5faf7;
+    border-left: 4px solid #7fc29b;
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 6px;
+}
+
+.action-input-section pre,
+.action-output-section pre {
+    background: transparent;
+    padding: 0;
+    margin-top: 8px;
+    overflow-x: auto;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+    color: inherit;
+}
+
+/* Action Output Section - Green theme */
+.action-output-section {
+    background: #eff7f2;
+    border-left: 4px solid #52a572;
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.action-output-section .section-label {
+    color: #52a572;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.loading-output {
+    color: #8b9299;
+    font-style: italic;
+    font-size: 12px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-success {
+    background: #e8f5ed;
+    color: #5a9b73;
+}
+
+.status-failed {
+    background: #fdecea;
+    color: #b8665f;
+}
+
+/* Subgoal Update Card */
+.subgoal-update-card {
+    background: white;
+    border: 1px solid #c5cde0;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(100, 120, 180, 0.12);
+    animation: slideIn 0.3s ease-out;
+}
+
+.subgoal-update-header {
+    font-weight: 600;
+    font-size: 12px;
+    color: #5a72b5;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #d8dfe8;
+}
+
+.subgoal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.subgoal-item {
+    background: white;
+    border-left: 3px solid #c5c9d6;
+    padding: 8px 12px;
+    border-radius: 5px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.subgoal-item:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.subgoal-item.pending {
+    border-left-color: #9da3b8;
+    background: #fafbfc;
+}
+
+.subgoal-item.in-progress {
+    border-left-color: #5a72b5;
+    background: #f5f7fc;
+}
+
+.subgoal-item.completed {
+    border-left-color: #52a572;
+    background: #f7fbf9;
+    opacity: 0.9;
+}
+
+.subgoal-id {
+    font-weight: 700;
+    font-size: 12px;
+    color: #4a5568;
+    min-width: 18px;
+    flex-shrink: 0;
+}
+
+.subgoal-description {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #4a5568;
+    flex: 1;
+}
+
+.subgoal-status {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.subgoal-item.pending .subgoal-status {
+    background: #e3e6ed;
+    color: #6b7280;
+}
+
+.subgoal-item.in-progress .subgoal-status {
+    background: #dfe4f2;
+    color: #4a5fa8;
+}
+
+.subgoal-item.completed .subgoal-status {
+    background: #dff2e6;
+    color: #3d7a52;
+}
+
+/* Inline Subgoal Items (in action output) */
+.subgoal-item-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.subgoal-id-inline {
+    font-weight: 700;
+    color: #4a5568;
+    min-width: 18px;
+    flex-shrink: 0;
+}
+
+.subgoal-desc-inline {
+    color: #4a5568;
+    flex: 1;
+}
+
+.subgoal-status-inline {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.subgoal-item-inline.pending .subgoal-status-inline {
+    background: #e3e6ed;
+    color: #6b7280;
+}
+
+.subgoal-item-inline.in-progress .subgoal-status-inline {
+    background: #dfe4f2;
+    color: #4a5fa8;
+}
+
+.subgoal-item-inline.completed .subgoal-status-inline {
+    background: #dff2e6;
+    color: #3d7a52;
+}
+
+/* Final Report */
+.final-report {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 4px solid #000000;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Reupload Button */
+.reupload-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    width: auto;
+}
+
+.reupload-btn:hover {
+    background-color: rgba(0, 0, 0, 0.85);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Highlight Button */
+.highlight-btn {
+    background-color: #000000;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    width: auto;
+}
+
+.highlight-btn:hover {
+    background-color: #333333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 900px) {
+    body {
+        height: auto;
+        overflow: auto;
+        overflow-x: hidden;
+    }
+
+    .main-container {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .left-panel,
+    .right-panel {
+        width: 100%;
+    }
+
+    .left-panel {
+        height: 45vh;
+        min-height: 260px;
+    }
+
+    .right-panel {
+        padding: 12px;
+        box-shadow: none;
+        box-sizing: border-box;
+    }
 }

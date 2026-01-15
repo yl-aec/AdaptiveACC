@@ -42,66 +42,6 @@ def get_element_by_id(ifc_file: ifcopenshell.file, global_id: str) -> Optional[i
         return None
 
 
-def get_element_guid(element: ifcopenshell.entity_instance) -> str:
-    """Get element's GlobalId.
-
-    Args:
-        element: IFC element instance
-
-    Returns:
-        GlobalId string
-    """
-    if not element or not hasattr(element, 'GlobalId'):
-        return ""
-    return element.GlobalId
-
-
-def get_element_name(element: ifcopenshell.entity_instance) -> str:
-    """Get element's name.
-
-    Args:
-        element: IFC element instance
-
-    Returns:
-        Element name or empty string if not available
-    """
-    if not element:
-        return ""
-    if hasattr(element, 'Name') and element.Name:
-        return element.Name
-    return ""
-
-
-def get_element_type_name(element: ifcopenshell.entity_instance) -> str:
-    """Get element's IFC type name.
-
-    Args:
-        element: IFC element instance
-
-    Returns:
-        IFC type string (e.g., "IfcWall")
-    """
-    if not element:
-        return ""
-    return element.is_a()
-
-
-def get_element_description(element: ifcopenshell.entity_instance) -> str:
-    """Get element's description.
-
-    Args:
-        element: IFC element instance
-
-    Returns:
-        Element description or empty string if not available
-    """
-    if not element:
-        return ""
-    if hasattr(element, 'Description') and element.Description:
-        return element.Description
-    return ""
-
-
 def get_elements_by_ids(ifc_file: ifcopenshell.file, global_ids: List[str]) -> List[ifcopenshell.entity_instance]:
     """Get multiple elements by their GlobalIds.
 
@@ -120,3 +60,56 @@ def get_elements_by_ids(ifc_file: ifcopenshell.file, global_ids: List[str]) -> L
     return elements
 
 
+def get_elements_by_property_value(
+    ifc_file: ifcopenshell.file,
+    element_type: str,
+    property_name: str,
+    property_value,
+    pset_name: Optional[str] = None
+) -> List[ifcopenshell.entity_instance]:
+    """Get elements filtered by a simple property value.
+
+    Filters elements where a specific property matches the given value.
+    Searches in property sets if pset_name specified, otherwise searches direct attributes.
+
+    Args:
+        ifc_file: Open IFC file instance
+        element_type: IFC type string (e.g., "IfcWall", "IfcDoor")
+        property_name: Name of the property to check
+        property_value: Expected value of the property
+        pset_name: Optional property set name to search in
+
+    Returns:
+        List of IFC element instances where property matches value
+
+    Example:
+        # Get all external walls using direct attribute
+        external_walls = get_elements_by_property_value(
+            ifc_file, "IfcWall", "IsExternal", True
+        )
+
+        # Get fire-rated doors from property set
+        fire_doors = get_elements_by_property_value(
+            ifc_file, "IfcDoor", "FireRating", "EI30", "Pset_DoorCommon"
+        )
+    """
+    import ifcopenshell.util.element
+
+    if not ifc_file:
+        return []
+
+    elements = get_elements_by_type(ifc_file, element_type)
+    filtered = []
+
+    for element in elements:
+        if pset_name:
+            # Use ifcopenshell.util.element.get_psets() instead of removed get_all_psets()
+            psets = ifcopenshell.util.element.get_psets(element)
+            if pset_name in psets and property_name in psets[pset_name]:
+                if psets[pset_name][property_name] == property_value:
+                    filtered.append(element)
+        else:
+            if hasattr(element, property_name) and getattr(element, property_name) == property_value:
+                filtered.append(element)
+
+    return filtered

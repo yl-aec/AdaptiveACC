@@ -28,9 +28,11 @@ class ToolVectorManager(Singleton):
         embedding_kwargs = {
             "model": Config.EMBEDDING_MODEL_NAME,
             "openai_api_key": Config.EMBEDDING_API_KEY,
-            "dimensions": 1536
+            "dimensions": 1536,
+            "timeout": 60,  # 60 second timeout for embedding API calls
+            "max_retries": 2  # Retry up to 2 times on failure
         }
-        
+
         # Add base URL if specified for embedding API
         if Config.EMBEDDING_API_BASE:
             embedding_kwargs["openai_api_base"] = Config.EMBEDDING_API_BASE
@@ -128,7 +130,7 @@ class ToolVectorManager(Singleton):
             # Add to vector store
             self.vector_store.add_texts([text_content], metadatas=[filtered_metadata])
             
-            print(f"Added tool '{tool_metadata.get('tool_name', 'unknown')}' to vector database")
+            print(f"Added tool '{tool_metadata.get('ifc_tool_name', 'unknown')}' to vector database")
             return True
             
         except Exception as e:
@@ -239,7 +241,7 @@ class ToolVectorManager(Singleton):
             # Find the document ID(s) for this tool_name
             collection = self.vector_store._collection
             results = collection.get(
-                where={"tool_name": tool_name},
+                where={"ifc_tool_name": tool_name},
                 include=["metadatas"]
             )
 
@@ -258,6 +260,28 @@ class ToolVectorManager(Singleton):
             print(f"Error deleting tool from vector database: {e}")
             return False
 
+    def delete_by_id(self, document_id: str) -> bool:
+        """Delete a document from vector database by ID
+
+        Args:
+            document_id: ChromaDB document ID to delete
+
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        self._ensure_loaded()
+
+        if self.vector_store is None:
+            return False
+
+        try:
+            self.vector_store.delete(ids=[document_id])
+            return True
+
+        except Exception as e:
+            print(f"Error deleting document {document_id} from vector database: {e}")
+            return False
+
     def update_tool(self, tool_metadata: Dict[str, Any]) -> bool:
         """Update a tool in vector database (delete old, add new)
 
@@ -267,7 +291,7 @@ class ToolVectorManager(Singleton):
         Returns:
             True if updated successfully, False otherwise
         """
-        tool_name = tool_metadata.get('tool_name', 'unknown')
+        tool_name = tool_metadata.get('ifc_tool_name', 'unknown')
 
         # Delete old version
         self.delete_tool(tool_name)

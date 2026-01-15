@@ -5,6 +5,12 @@ from typing import Dict, Any, Optional
 from smolagents.local_python_executor import LocalPythonExecutor as SmolagentsExecutor
 from models.common_models import TestResult
 
+# Import ifcopenshell.util modules for function injection
+import ifcopenshell.util.element
+import ifcopenshell.util.placement
+import ifcopenshell.util.shape
+import ifcopenshell.util.unit
+
 
 class LocalPythonExecutor:
     """Local Python code executor using smolagents with sandboxing"""
@@ -14,6 +20,7 @@ class LocalPythonExecutor:
         self.max_memory_mb = max_memory_mb
         # Add print function and other basic functions to allowed functions
         additional_functions = {
+            # Basic Python functions
             'print': print,
             'len': len,
             'str': str,
@@ -26,17 +33,76 @@ class LocalPythonExecutor:
             'isinstance': isinstance,
             'hasattr': hasattr,
             'getattr': getattr,
-            'setattr': setattr
+            'setattr': setattr,
+
+            # Injected ifcopenshell.util.element functions (most commonly used)
+            # Property and type access
+            'get_psets': ifcopenshell.util.element.get_psets,
+            'get_pset': ifcopenshell.util.element.get_pset,
+            'get_property': ifcopenshell.util.element.get_property,
+            'get_type': ifcopenshell.util.element.get_type,
+            'get_predefined_type': ifcopenshell.util.element.get_predefined_type,
+
+            # Material access
+            'get_material': ifcopenshell.util.element.get_material,
+            'get_materials': ifcopenshell.util.element.get_materials,
+
+            # Quantities
+            'get_quantities': ifcopenshell.util.element.get_quantities,
+            'get_quantity': ifcopenshell.util.element.get_quantity,
+
+            # Spatial relationships
+            'get_container': ifcopenshell.util.element.get_container,
+            'get_contained': ifcopenshell.util.element.get_contained,
+
+            # Opening relationships
+            'get_openings': ifcopenshell.util.element.get_openings,
+            'get_filled_void': ifcopenshell.util.element.get_filled_void,
+            'get_voided_element': ifcopenshell.util.element.get_voided_element,
+
+            # Decomposition and aggregation
+            'get_decomposition': ifcopenshell.util.element.get_decomposition,
+            'get_aggregate': ifcopenshell.util.element.get_aggregate,
+            'get_parts': ifcopenshell.util.element.get_parts,
+
+            # Groups
+            'get_groups': ifcopenshell.util.element.get_groups,
+            'get_grouped_by': ifcopenshell.util.element.get_grouped_by,
+
+            # Placement and geometry (from ifcopenshell.util.placement)
+            'get_local_placement': ifcopenshell.util.placement.get_local_placement,
+            'get_storey_elevation': ifcopenshell.util.placement.get_storey_elevation,
+
+            # Shape queries (from ifcopenshell.util.shape)
+            'get_volume': ifcopenshell.util.shape.get_volume,
+            'get_footprint_area': ifcopenshell.util.shape.get_footprint_area,
+            'get_side_area': ifcopenshell.util.shape.get_side_area,
+            'get_top_elevation': ifcopenshell.util.shape.get_top_elevation,
+            'get_bottom_elevation': ifcopenshell.util.shape.get_bottom_elevation,
+
+            # Unit conversions (from ifcopenshell.util.unit)
+            'get_project_unit': ifcopenshell.util.unit.get_project_unit,
+            'get_property_unit': ifcopenshell.util.unit.get_property_unit,
+            'get_unit_name': ifcopenshell.util.unit.get_unit_name,
+            'get_unit_symbol': ifcopenshell.util.unit.get_unit_symbol,
+            'calculate_unit_scale': ifcopenshell.util.unit.calculate_unit_scale,
+            'convert': ifcopenshell.util.unit.convert,
         }
         
         self.executor = SmolagentsExecutor(
             additional_authorized_imports=[
-                # Original imports
-                'pytest', 'ifcopenshell', 'os', 'json', 'traceback',
+                # Core libraries
+                'pytest', 'ifcopenshell', 'os', 'json', 'traceback', 'tempfile',
+                # ifcopenshell modules
+                'ifcopenshell.geom',
+                # ifcopenshell.util modules - allowed for import statements
+                # Note: Functions are still injected via additional_functions for sandbox access
+                'ifcopenshell.util.element',
+                'ifcopenshell.util.placement',
+                'ifcopenshell.util.shape',
+                'ifcopenshell.util.unit',
                 # Standard library (essential for type hints)
                 'typing', 'collections',
-                # Third-party libraries (geometry operations)
-                'shapely', 'trimesh', 'numpy',
                 # Custom modules - top level
                 'ifc_tool_utils', 'utils',
                 # Custom modules - submodules (explicit paths required by smolagents)
@@ -44,12 +110,8 @@ class LocalPythonExecutor:
                 'ifc_tool_utils.ifcopenshell',
                 'ifc_tool_utils.ifcopenshell.element_queries',
                 'ifc_tool_utils.ifcopenshell.property_queries',
-                'ifc_tool_utils.ifcopenshell.geometry_queries',
                 'ifc_tool_utils.ifcopenshell.relationship_queries',
-                'ifc_tool_utils.shapely',
-                'ifc_tool_utils.shapely.geometry_utils',
-                'ifc_tool_utils.trimesh',
-                'ifc_tool_utils.trimesh.mesh_utils'
+                'ifc_tool_utils.ifcopenshell.quantity_queries'
             ],
             additional_functions=additional_functions
         )
@@ -66,10 +128,10 @@ class LocalPythonExecutor:
                 for key, value in test_inputs.items():
                     inputs_code += f"{key} = {repr(value)}\n"
                 code = inputs_code + "\n" + code
-            
+
             # Execute using smolagents executor
             result = self.executor(code)
-            
+
             # Handle smolagents CodeOutput result
             if hasattr(result, 'output'):
                 success = True  # If no exception was raised, consider it successful
@@ -80,12 +142,21 @@ class LocalPythonExecutor:
                 success = True
                 output = str(result)
                 error = ""
-                
+
         except Exception as e:
-            success = False
-            output = ""
-            error = f"Execution error: {str(e)}"
-        
+            # Check if this is a ReturnException from smolagents (normal return, not an error)
+            from smolagents.local_python_executor import ReturnException
+            if isinstance(e, ReturnException):
+                # This is a normal function return, extract the returned value
+                success = True
+                output = str(e.args[0]) if e.args else ""
+                error = ""
+            else:
+                # This is an actual error
+                success = False
+                output = ""
+                error = f"Execution error: {str(e)}"
+
         return TestResult(
             success=success,
             output=output,

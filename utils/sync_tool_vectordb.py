@@ -2,8 +2,16 @@
 Script to incrementally sync the tool vector database with current domain tools
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+import json
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 from ifc_tools.ifc_tool_registry import IFCToolRegistry
 from utils.rag_tool import ToolVectorManager
 
@@ -23,7 +31,7 @@ def extract_tool_metadata(tool_name: str, tool_schema: dict) -> dict:
     description = function.get("description", "")
 
     metadata = {
-        "tool_name": tool_name,
+        "ifc_tool_name": tool_name,
         "description": description,
         "parameters": ", ".join(param_names)
     }
@@ -52,15 +60,64 @@ def has_tool_changed(current_tool: dict, existing_tool: dict) -> bool:
             current_params != existing_params)
 
 
+def sync_metadata_json() -> Tuple[int, int]:
+    """Sync metadata.json with actual files in ifc_tools/generated/
+
+    Removes metadata entries for tools that no longer exist as files.
+
+    Returns:
+        Tuple of (total_metadata_count, removed_count)
+    """
+    metadata_file = Path("ifc_tools/generated/metadata.json")
+    generated_dir = Path("ifc_tools/generated")
+
+    # Check if metadata file exists
+    if not metadata_file.exists():
+        print("  metadata.json not found, skipping sync")
+        return (0, 0)
+
+    # Load existing metadata
+    with open(metadata_file, 'r', encoding='utf-8') as f:
+        metadata = json.load(f)
+
+    original_count = len(metadata)
+
+    # Find all actual .py tool files (excluding __init__.py)
+    existing_tool_files = set()
+    for py_file in generated_dir.rglob("*.py"):
+        if py_file.name != "__init__.py":
+            # Extract tool name from filename (remove .py extension)
+            tool_name = py_file.stem
+            existing_tool_files.add(tool_name)
+
+    # Find metadata entries that don't have corresponding files
+    to_remove = []
+    for tool_name in metadata.keys():
+        if tool_name not in existing_tool_files:
+            to_remove.append(tool_name)
+
+    # Remove orphaned metadata entries
+    for tool_name in to_remove:
+        del metadata[tool_name]
+        print(f"    - Removed metadata: {tool_name}")
+
+    # Save updated metadata
+    if to_remove:
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    return (original_count, len(to_remove))
+
+
 def sync_vectordb():
     """Incrementally sync vector database with current domain tools"""
 
     print("=" * 60)
-    print("SYNCING TOOL VECTOR DATABASE")
+    print("SYNCING TOOL VECTOR DATABASE AND METADATA")
     print("=" * 60)
 
     # Step 1: Load current tools from registry
-    print("\n[1/5] Loading current domain tools from registry...")
+    print("\n[1/6] Loading current domain tools from registry...")
     domain_registry = IFCToolRegistry.get_instance()
     tool_schemas = domain_registry.get_tools_json(api_format="openai-chatcompletion")
 
@@ -73,7 +130,7 @@ def sync_vectordb():
     print(f"Found {len(current_tools)} tools in registry")
 
     # Step 2: Load existing tools from vectordb
-    print("\n[2/5] Loading existing tools from vector database...")
+    print("\n[2/6] Loading existing tools from vector database...")
     tool_vector_manager = ToolVectorManager.get_instance()
 
     if not tool_vector_manager.is_available():
@@ -81,12 +138,23 @@ def sync_vectordb():
         return False
 
     existing_tools = tool_vector_manager.get_all_tools()
-    existing_tool_map = {t['tool_name']: t for t in existing_tools}
 
-    print(f"Found {len(existing_tools)} tools in vector database")
+    # Build map with error handling for missing ifc_tool_name field
+    existing_tool_map = {}
+    invalid_tool_ids = []
+    for t in existing_tools:
+        if 'ifc_tool_name' in t:
+            existing_tool_map[t['ifc_tool_name']] = t
+        else:
+            invalid_tool_ids.append(t.get('_id'))
+            print(f"  WARNING: Found tool with missing 'ifc_tool_name' field: {t.get('_id', 'unknown')}")
+
+    print(f"Found {len(existing_tool_map)} valid tools in vector database")
+    if invalid_tool_ids:
+        print(f"  Found {len(invalid_tool_ids)} invalid tools to clean up")
 
     # Step 3: Calculate differences
-    print("\n[3/5] Calculating differences...")
+    print("\n[3/6] Calculating differences...")
     current_names = set(current_tools.keys())
     existing_names = set(existing_tool_map.keys())
 
@@ -106,11 +174,22 @@ def sync_vectordb():
     print(f"  Unchanged: {len(to_check) - len(to_update)}")
 
     # Step 4: Apply changes
-    print("\n[4/5] Applying changes...")
+    print("\n[4/6] Applying changes to vector database...")
 
     deleted_count = 0
     added_count = 0
     updated_count = 0
+    cleaned_count = 0
+
+    # Clean up invalid entries first
+    if invalid_tool_ids:
+        print(f"\n  [CLEANUP] Removing {len(invalid_tool_ids)} invalid entries...")
+        for doc_id in invalid_tool_ids:
+            if tool_vector_manager.delete_by_id(doc_id):
+                cleaned_count += 1
+                print(f"    - Cleaned: {doc_id}")
+            else:
+                print(f"    - Failed to clean: {doc_id}")
 
     # Delete removed tools
     if to_delete:
@@ -142,19 +221,36 @@ def sync_vectordb():
             else:
                 print(f"    * Failed to update: {tool_name}")
 
+    # Step 4.5: Sync metadata.json
+    print("\n[4.5/6] Syncing metadata.json for generated tools...")
+    metadata_original_count, metadata_removed_count = sync_metadata_json()
+    if metadata_removed_count > 0:
+        print(f"  Cleaned {metadata_removed_count} orphaned metadata entries")
+    else:
+        print(f"  No orphaned metadata entries found")
+
     # Step 5: Summary
-    print("\n[5/5] Verification...")
+    print("\n[5/6] Verification...")
     stats = tool_vector_manager.get_stats()
     final_count = stats.get('tool_count', 0)
 
+    # Step 6: Final report
+    print("\n[6/6] Final report...")
     print("\n" + "=" * 60)
     print("SYNC COMPLETE")
     print("=" * 60)
-    print(f"Deleted: {deleted_count}")
-    print(f"Added: {added_count}")
-    print(f"Updated: {updated_count}")
-    print(f"Unchanged: {len(to_check) - len(to_update)}")
-    print(f"Total in database: {final_count}")
+    print("\nVector Database:")
+    print(f"  Cleaned: {cleaned_count}")
+    print(f"  Deleted: {deleted_count}")
+    print(f"  Added: {added_count}")
+    print(f"  Updated: {updated_count}")
+    print(f"  Unchanged: {len(to_check) - len(to_update)}")
+    print(f"  Total in database: {final_count}")
+
+    print("\nMetadata JSON:")
+    print(f"  Original entries: {metadata_original_count}")
+    print(f"  Removed entries: {metadata_removed_count}")
+    print(f"  Remaining entries: {metadata_original_count - metadata_removed_count}")
 
     expected_count = len(current_tools)
     if final_count == expected_count:

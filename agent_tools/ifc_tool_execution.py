@@ -78,13 +78,21 @@ class ToolExecution:
     def execute_in_tool_registry(self, tool_name: str, parameters: Dict[str, Any]) -> IFCToolResult:
 
         try:
+            # Auto-inject ifc_file_path if missing
+            if "ifc_file_path" not in parameters:
+                ifc_file_path = self.shared_context.session_info.get("ifc_file_path")
+                if ifc_file_path:
+                    parameters["ifc_file_path"] = ifc_file_path
+                    print(f"[Auto-inject] Added ifc_file_path: {ifc_file_path}")
+
             # Check if tool exists
             if tool_name not in self.tool_registry.get_available_tools():
                 return IFCToolResult(
                     success=False,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    error_message=f"Tool '{tool_name}' not found in tool registry"
+                    error_message=f"Tool '{tool_name}' not found in tool registry",
+                    tool_source="existing"
                 )
 
             # Construct standard tool call format for DomainToolRegistry
@@ -109,14 +117,16 @@ class ToolExecution:
                     success=True,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    result=result
+                    result=result,
+                    tool_source="existing"  # Tool from registry = pre-existing
                 )
             else:
                 return IFCToolResult(
                     success=False,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    error_message=f"Tool execution returned no result for '{tool_name}'"
+                    error_message=f"Tool execution returned no result for '{tool_name}'",
+                    tool_source="existing"
                 )
 
         except Exception as e:
@@ -126,12 +136,57 @@ class ToolExecution:
                 parameters_used=parameters,
                 error_message=f"Tool execution failed: {str(e)}",
                 exception_type=type(e).__name__,
-                traceback=traceback.format_exc()
+                traceback=traceback.format_exc(),
+                tool_source="existing"
             )
+
+    def _validate_parameters(self, tool_name: str, parameters: Dict[str, Any], metadata: Dict) -> tuple[bool, str]:
+        """
+        Validate parameters against tool metadata.
+        Returns (is_valid, error_message)
+        """
+        if not metadata or not isinstance(metadata, dict):
+            # No metadata available, skip validation
+            return True, ""
+
+        param_specs = metadata.get('parameters', [])
+        if not param_specs:
+            # No parameter specifications, skip validation
+            return True, ""
+
+        # Build a map of parameter specs
+        spec_map = {}
+        for spec in param_specs:
+            param_name = spec.get('name')
+            if param_name:
+                spec_map[param_name] = spec
+
+        # Check for missing required parameters
+        missing_params = []
+        for param_name, spec in spec_map.items():
+            if spec.get('required', True) and param_name not in parameters:
+                missing_params.append(f"{param_name} ({spec.get('type', 'Any')})")
+
+        if missing_params:
+            return False, f"Missing required parameters: {', '.join(missing_params)}"
+
+        # Check for unexpected parameters (warning only, not an error)
+        unexpected_params = [p for p in parameters.keys() if p not in spec_map]
+        if unexpected_params:
+            print(f"Warning: Unexpected parameters for tool '{tool_name}': {', '.join(unexpected_params)}")
+
+        return True, ""
 
     def execute_in_sandbox(self, tool_name: str, parameters: Dict[str, Any]) -> IFCToolResult:
         """Execute tool in sandbox environment for newly created tools"""
         try:
+            # Auto-inject ifc_file_path if missing
+            if "ifc_file_path" not in parameters:
+                ifc_file_path = self.shared_context.session_info.get("ifc_file_path")
+                if ifc_file_path:
+                    parameters["ifc_file_path"] = ifc_file_path
+                    print(f"[Auto-inject] Added ifc_file_path: {ifc_file_path}")
+
             # Get tool code from SharedContext
             shared_context = SharedContext.get_instance()
             tool_result = shared_context.get_tool_by_name(tool_name)
@@ -141,7 +196,8 @@ class ToolExecution:
                     success=False,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    error_message=f"Tool '{tool_name}' source code not found in SharedContext"
+                    error_message=f"Tool '{tool_name}' source code not found in SharedContext",
+                    tool_source="created"
                 )
 
             # Handle both dict and object formats (tool_result may be serialized as dict)
@@ -157,7 +213,19 @@ class ToolExecution:
                     success=False,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    error_message=f"Tool '{tool_name}' has no code in SharedContext"
+                    error_message=f"Tool '{tool_name}' has no code in SharedContext",
+                    tool_source="created"
+                )
+
+            # Validate parameters against metadata
+            is_valid, error_msg = self._validate_parameters(tool_name, parameters, metadata)
+            if not is_valid:
+                return IFCToolResult(
+                    success=False,
+                    ifc_tool_name=tool_name,
+                    parameters_used=parameters,
+                    error_message=f"Parameter validation failed: {error_msg}",
+                    tool_source="created"
                 )
 
             # Create sandbox executor and execute directly
@@ -180,14 +248,16 @@ class ToolExecution:
                     success=True,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    result=parsed_result
+                    result=parsed_result,
+                    tool_source="created"  # Tool from sandbox = created in current session
                 )
             else:
                 return IFCToolResult(
                     success=False,
                     ifc_tool_name=tool_name,
                     parameters_used=parameters,
-                    error_message=f"Sandbox execution failed: {result.error}"
+                    error_message=f"Sandbox execution failed: {result.error}",
+                    tool_source="created"
                 )
 
         except Exception as e:
@@ -197,5 +267,6 @@ class ToolExecution:
                 parameters_used=parameters,
                 error_message=f"Sandbox execution error: {str(e)}",
                 exception_type=type(e).__name__,
-                traceback=traceback.format_exc()
+                traceback=traceback.format_exc(),
+                tool_source="created"
             )

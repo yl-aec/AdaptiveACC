@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
   build: {
@@ -17,5 +18,15 @@ export default defineConfig({
   },
   server: {
     port: 3000
-  }
+  },
+  plugins: [
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/web-ifc/*.wasm',
+          dest: 'wasm'
+        }
+      ]
+    })
+  ]
 });

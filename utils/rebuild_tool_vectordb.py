@@ -2,8 +2,14 @@
 Script to rebuild the tool vector database with current domain tools
 """
 
-import shutil
+import sys
 from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+import shutil
 from datetime import datetime
 from ifc_tools.ifc_tool_registry import IFCToolRegistry
 from utils.rag_tool import ToolVectorManager

@@ -3,7 +3,7 @@ import json
 from typing import Dict, List, Any
 from utils.llm_client import LLMClient
 from models.common_models import SubgoalSetModel, AgentToolResult
-from models.shared_context import SharedContext
+from models.shared_context import SharedContext, format_interpretation
 from telemetry.tracing import trace_method
 from agent_tools.regulation_interpretation import RegulationInterpretationTool
 
@@ -38,106 +38,130 @@ class SubgoalManagement:
             if interp_result.success:
                 interpretation = interp_result.result
                 print(f"[SubgoalManagement] Interpretation generated with {len(interpretation.term_clarifications)} term clarifications")
-
-                # Store interpretation in SharedContext for persistent access
-                self.shared_context.session_info['regulation_interpretation'] = interpretation.model_dump()
+                # Interpretation already stored by RegulationInterpretationTool in session_info["interpretation"]
             else:
                 raise RuntimeError(f"Interpretation generation failed: {interp_result.error}")
 
             # Build system prompt
             system_prompt = """
-            You are a building compliance planning expert. Your task is to generate high-level subgoals for a compliance checking process.
+            You are a **building compliance planning expert**.  
 
             ## Your Task
-            Generate subgoals that guide the compliance checking process. Each subgoal must describe **WHAT** needs to be achieved, not **HOW** it should be achieved.
+            Generate **high-level, atomic subgoals** for the compliance checking process.
+            The generated subgoals should describe **WHAT** must be achieved (never HOW).  
+            Each subgoal must correspond to **one atomic action** and be part of one of the four action types below.
+            ──────────────────────────────────────────────────────────
+            ## The Four Sequential Steps
+            Each subgoal must belong to exactly one of these steps.
 
-            ## Subgoal Generation Guidelines
+            ### **1. Identification [Step1]**
+            **Intent:** Define the initial scope of relevant elements.
+            **Action:** Filter by type, classification, or static properties.
 
-            ### Core Principle: One Subgoal, One Atomic Action
-            This is the most important rule. Each subgoal must correspond to **a single, indivisible action** from one of the four logical flow phases (1. Identification & Scoping, 2. Data Collection, 3. Analysis & Calculation, 4. Verification & Comparison). A subgoal must never combine actions from different phases.
+            **Goal Patterns:**
+            - "Identify element IDs for all [element type]."
+            - "Identify element IDs for all [element type] that meet [condition]."
+            **Output:** A list of element IDs.
 
-            **CRITICAL EXAMPLE:** To check if door widths comply with a regulation:
+            ### **2. Data Collection [Step2]**
+            **Intent:** Fetch raw model data for a known list of element IDs.
+            **Action:** Retrieve necessary raw IFC data for compliance verification.
+            **Goal Patterns:**
+            - "Obtain the [property] for the elements in [ID list]."
+            - "Collect [relationship] data for the elements in [ID list]."
+            **Output:** Raw data keyed by element ID.
 
-            **- BAD (Combines all phases into one):**
-            - "Verify all fire exit doors have a clear width of at least 1000mm."
+            ### **3. Analysis & Calculation [Step3]**
+            **Intent:** Derive or transform information **using already collected data**.
+            **Action:** Compute a metric, filter, aggregate, map, or join datasets.
+            **Goal Patterns:**
+            - "Calculate [derived metric] for each element."
+            - "Analyze [dataset] to find [result]."
+            **Output:** Derived results or transformed datasets.
 
-            **- GOOD (Broken down into atomic, sequential subgoals):**
-            1.  **(Identification & Scoping):** "Identify and list all doors designated as fire exits."
-            2.  **(Data Collection):** "Obtain the necessary geometric data (e.g., wall thickness, door frame geometry, and leaf dimensions) for all identified fire exit doors."
-            3.  **(Analysis & Calculation):** "Calculate the clear, unobstructed width for each fire exit door using its geometric data."
-            4.  **(Verification & Comparison):** "Verify that the calculated clear width of each fire exit door is greater than or equal to 1000mm."
+            ### **4. Verification & Comparison [Step4]**
+            **Intent:** Mark WHAT needs to be verified against regulatory requirements.
+            **Action:** Describe the verification requirement (not the execution method).
+            **Goal Patterns:**
+            - "Verify that [value] is [comparison] [requirement]."
+            - "Check whether [condition] holds for each element."
+            **Output:** Verification requirement specification.
+            ──────────────────────────────────────────────────────────
+            ## Dynamic Dependency Graph (Not a Fixed Sequence)
+            The subgoal sequence does **not** have to follow Step1 -> Step2 -> Step3 -> Step4 strictly.
+            Any subgoal may depend on the output of **any** earlier subgoal.
 
+            **IMPORTANT CONSTRAINT: Filtering Priority**
+            - Step1 filtering: Use for subset identification based on **intrinsic properties** (type, attributes, property sets that exist in the model)
+            - Step3 filtering: Only for **derived conditions** (calculations, spatial relationships, complex logic that requires prior data collection)
+            - **Never defer simple property-based filtering to Step3** if it can be done in Step1
+            ──────────────────────────────────────────────────────────
+            ## Subgoal Requirements
+            Each subgoal must be a JSON object with:
+            - `"description"` — WHAT needs to be done
+            - `"rationale"` — WHY this step is necessary and how it supports compliance checking
 
-            ### Logical Flow (Optimized Sequence with Patterns)
-            The data collection and verification process must follow this logical progression. Each step includes the primary **Goal Patterns** that belong to it:
+            ### Rationale Examples
+            - "To define the primary scope of elements"
+            - "To obtain property data required for later calculation."
+            - "To derive a filtered list of relevant wall IDs."
 
-            1.  **Identification & Scoping:** Determine the relevant elements, their context, and the scope of the check.
-                * **Goal Patterns:**
-                    * "Determine all [elements] relevant to the [specific requirement]";
-                    * "Scope the check to [specific area or type]".
+            ### Additional Requirements
+            - Subgoals must be **atomic** (only one action type per subgoal).
+            - Focus on *intent*, not tool usage or implementation details.
+            ──────────────────────────────────────────────────────────
+            ## Step1 Scope Identification (CRITICAL)
+            **Core principle:** Filter early. Step1 scope should match regulation's intended scope.
 
-            2.  **Data Collection:** Gather necessary **stored properties** (i.e., data directly readable from the model).
-                * **Goal Patterns:**
-                    * "Obtain [stored property] data for all identified [elements]";
-                    * "Collect initial [relationship] information for [elements]".
+            **Ask: Does regulation apply to ALL elements of a type, or a SUBSET?**
+            - If regulation describes elements by ROLE/FUNCTION/DESIGNATION → likely a subset
+            - Check regulation interpretation's `required_data` for distinguishing properties
 
-            3.  **Analysis & Calculation:** Execute complex operations to **derive new data** (e.g., spatial analysis, geometric calculations, relationship checks).
-                * **Goal Patterns:**
-                    * "**Calculate** the [derived metric/clearance] for [elements]";
-                    * "**Analyze** the [spatial/topological pattern] between [elements]".
-
-            4.  **Verification & Comparison:** Check the collected or derived data against the compliance requirements.
-                * **Goal Patterns:**
-                    * "Verify that all [elements] meet the [numerical/categorical requirement]";
-                    * "Check that [relationship] exists and is compliant between [elements]".
-
-
-            ### Other Key Guidelines
-            -   **Focus on Goals, Not Methods**:
-                -   **Good**: "Obtain width measurements for all doors"
-                -   **Bad**: "Use the get_door_properties tool to extract the Width attribute"
-
-            ### Subgoal Requirements
-            -   **Format:** Each subgoal must be a JSON object with `description` and `rationale` fields.
-            -   **Granularity:** Subgoals must be **atomic**. Decompose complex compliance requirements into a sequence of smaller steps, where each step aligns with a single action type (e.g., a single act of collecting data, a single calculation, or a single verification). Avoid creating subgoals that require multiple distinct logical operations.
-            -   **Intent Focus:** Focus on the compliance intent. For instance, if a regulation is about clearance, use "Determine clear width" (a calculation goal) rather than the less precise "Obtain width measurement."
+            **Action:**
+            Use available tools to filter in Step1:
+            - `get_element_ids_by_type` - All elements of IFC type
+            - `get_elements_by_predefined_type` - By PredefinedType attribute
+            - `get_elements_by_property` - By property value (for subset identification)
+            - `find_spaces_by_function` - By space function keywords
             """
 
-            # Build interpretation section (always available now)
-            term_clarifications_text = "\n".join([
-                f"  - {tc.term}: {tc.meaning}" + (f" (IFC: {tc.ifc_mapping})" if tc.ifc_mapping else "")
-                for tc in interpretation.term_clarifications
-            ])
-            misunderstandings_text = "\n".join([f"  - {m}" for m in interpretation.common_misunderstandings])
-
-            interpretation_section = f"""
-            ## Regulation Interpretation:
-            Plain Language:
-            {interpretation.plain_language}
-
-            Key Terms:
-            {term_clarifications_text if term_clarifications_text else "  (none)"}
-
-            Common Misunderstandings to Avoid:
-            {misunderstandings_text if misunderstandings_text else "  (none)"}
-            """
+            # Build interpretation and required data sections with shared formatter
+            formatted_sections = format_interpretation(interpretation)
+            interpretation_section = formatted_sections["interpretation_section"]
+            required_data_section = formatted_sections["required_data_section"]
 
             prompt = f"""
             ## Regulation:
             "{regulation_text}"
             {interpretation_section}
+            {required_data_section}
 
-            Based on the regulation and all available information, generate initial subgoals for compliance checking.
-            Remember: Focus on WHAT to achieve, not HOW."""
+            Based on all available information, generate initial subgoals for compliance checking.
+            Remember: Focus on WHAT to achieve, not HOW.
+            """
 
             # Call LLM to generate subgoals
+
             subgoals = self.llm_client.generate_response(
                 prompt,
                 system_prompt,
                 response_model=SubgoalSetModel
             )
 
+            # Check if LLM call failed
+            if subgoals is None:
+                return AgentToolResult(
+                    success=False,
+                    agent_tool_name="generate_subgoals",
+                    error="LLM failed to generate subgoals (returned None)"
+                )
+
             print(f"SubgoalManagement: Generated {len(subgoals.subgoals)} initial subgoals")
+
+            # Automatically set the first subgoal to in_progress to signal the agent to start execution
+            if subgoals.subgoals:
+                subgoals.subgoals[0].status = "in_progress"
+                print(f"SubgoalManagement: Set subgoal {subgoals.subgoals[0].id} to 'in_progress'")
 
             return AgentToolResult(
                 success=True,
@@ -183,35 +207,76 @@ class SubgoalManagement:
             evidence_text = self.shared_context.format_successful_executions_summary(max_per_subgoal=3)
 
             # Build system prompt
-            system_prompt = """You are a task management expert for building compliance checking.
+            system_prompt = """
+            You are a **task management expert** for building compliance checking.
+            Your role is to **review the Agent’s progress** and **update all subgoals** based on the latest execution history.
 
+            ──────────────────────────────────────────────────────────
             ## Your Task
+            You may perform **any necessary modification** to maintain an accurate and coherent subgoal plan:
 
-            Review the Agent's progress and update all subgoals accordingly. You can perform ANY type of modification:
-            1. **Verify completions**: Check if Agent's claimed completions are justified by tool execution history
-            2. **Adjust existing subgoals**: Update descriptions or rationale if needed based on new discoveries
-            3. **Add new subgoals**: If new requirements are discovered during execution
-            4. **Remove/consolidate**: If some subgoals become irrelevant or can be merged
-            5. **Complete re-planning**: If the Agent reports that the entire approach is wrong, you can replace all subgoals with a new strategy
+            1. **Verify completions**: Confirm which subgoals are truly completed based on execution evidence.
+            2. **Adjust existing subgoals**: Revise descriptions or rationale if new insights or model discoveries require it.
+            3. **Add new subgoals**: When new data dependencies, overlooked requirements, or missing steps are discovered.
+            4. **Remove or consolidate subgoals**: When tasks become irrelevant, redundant, or logically mergeable.
+            5. **Full re-planning**: If the Agent reports that the current strategy is flawed, replace all subgoals with a new coherent plan.
 
-            ## Verification Principles
+            ──────────────────────────────────────────────────────────
+            ## Verification Principles (Critical)
+            A subgoal is “completed” **only when all of the following are true**:
 
-            - A subgoal is "completed" if sufficient data has been gathered to fulfill its objective
-            - Don't mark as completed if only partial data exists
-            - Be conservative: when in doubt, keep it "pending"
+            1. **execute_ifc_tool was called for this subgoal’s purpose**  
+            2. The execution returned **success=true**  
+            3. The returned data **fully satisfies the information required** by that subgoal  
+            4. No missing or failed data extraction remains
 
+            You must NOT mark a subgoal as completed in these cases:
+            - Only planning tools were used (`generate_subgoals`, `review_and_update_subgoals`)  
+            - `select_ifc_tool` or `create_ifc_tool` was called without actual execution  
+            - Any execution attempt failed (success=false)  
+            - Only partial results were obtained  
+            - The Agent claims completion without evidence
+
+            **When in doubt: mark the subgoal as pending or in_progress.  
+            Be conservative.**
+
+            ──────────────────────────────────────────────────────────
             ## Update Principles
+            - **Goal-oriented**: Subgoals always describe WHAT must be achieved, never HOW.
+            - **Independence**: Keep subgoals as independent as possible unless dependencies are unavoidable.
+            - **Adaptability**: If the Agent uncovers missing steps, introduce new subgoals immediately.
+            - **Coherence**: If the approach is fundamentally incorrect, perform a full re-plan.
+            - **Evidence-based**: All decisions must be grounded in actual `agent_history` and tool outputs stored in SharedContext.
+            - **Knowledge propagation**: When investigation discovers concrete data sources (specific property names, relationships, or geometric methods), update subsequent subgoal descriptions to reference these findings. This helps the Agent avoid repeating investigations.
 
-            - **Flexibility**: Support both incremental updates AND complete re-planning based on Agent's report
-            - **Goal orientation**: Maintain high-level WHAT not HOW focus
-            - **Independence**: Keep subgoals independent where possible
-            - **Adaptability**: If Agent discovers the current approach is fundamentally flawed, create a completely new set of subgoals
-            - **Evidence-based**: Ground decisions in actual tool execution history from SharedContext
+            ──────────────────────────────────────────────────────────
+            ## Subgoal Ordering Principles 
 
+            When modifying the subgoal list, maintain logical **execution order**:
+
+            1. **New subgoals must be inserted at the appropriate position**, not appended to the end.
+            2. Order subgoals by execution dependencies:
+               - Data identification before data collection
+               - Data collection before analysis
+               - Analysis before verification
+            3. **Do NOT move completed subgoals** - they should remain in their original positions.
+            4. **Assign sequential IDs** - Number subgoals sequentially starting from 1 (1, 2, 3, ...).
+
+            **Example:**
+            - Current: [1. Identify doors (completed), 2. Verify height (pending), 3. Check width (pending)]
+            - Need to add: "Extract door properties"
+            - ✓ CORRECT: [1. Identify doors (completed), 2. Extract door properties (pending), 3. Verify height (pending), 4. Check width (pending)]
+            - ✗ WRONG: [1. Identify doors (completed), 2. Verify height (pending), 3. Check width (pending), 4. Extract door properties (pending)]
+
+            ──────────────────────────────────────────────────────────
             ## Output Format
-
-            Return a complete SubgoalSetModel with all subgoals (updated/new/replaced).
-            Each subgoal should have: id, description, status, rationale."""
+            Return a complete `SubgoalSetModel`, reflecting your updated subgoal list.  
+            Every subgoal must include:
+            - `id`
+            - `description` (WHAT must be achieved)
+            - `status` (pending / in_progress / completed)
+            - `rationale` (WHY this step is necessary, linked to the compliance requirement)
+            """
 
             # Build user prompt
             prompt = f"""
@@ -229,12 +294,8 @@ class SubgoalManagement:
             ## Agent's Suggested Completed Subgoal IDs
             {suggested_completed_ids}
 
-            Based on the evidence collected for each subgoal, review and update all subgoals.
-            - Mark subgoals as "completed" only if sufficient IFC tool results have been collected
-            - Update status of other subgoals as needed (e.g., mark next as "in_progress")
-            - Adjust descriptions if needed based on new discoveries
-            - Add new subgoals if required
-            - Return the complete updated SubgoalSetModel."""
+            Review and update the subgoals based on the evidence above.
+            Return the complete updated SubgoalSetModel."""
 
             # 5. Call LLM
             updated_subgoals = self.llm_client.generate_response(
@@ -242,6 +303,14 @@ class SubgoalManagement:
                 system_prompt,
                 response_model=SubgoalSetModel
             )
+
+            # Check if LLM call failed
+            if updated_subgoals is None:
+                return AgentToolResult(
+                    success=False,
+                    agent_tool_name="review_and_update_subgoals",
+                    error="LLM failed to update subgoals (returned None)"
+                )
 
             print(f"SubgoalManagement: Reviewed and updated subgoals - {len(updated_subgoals.subgoals)} total")
             completed_count = sum(1 for sg in updated_subgoals.subgoals if sg.status == "completed")

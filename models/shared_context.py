@@ -1,9 +1,10 @@
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import json
 from pydantic import BaseModel, Field
 from utils.base_classes import Singleton
-from models.common_models import AgentToolResult, IFCToolResult, ComplianceEvaluationModel
+from models.common_models import AgentToolResult, IFCToolResult, ComplianceEvaluationModel, RegulationInterpretation
 
 class SharedContext(Singleton, BaseModel):
     """Singleton shared context for multi-agent collaboration (ReAct architecture)"""
@@ -11,7 +12,7 @@ class SharedContext(Singleton, BaseModel):
     # Core session information (immutable during execution)
     session_info: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Core session information: session_id, regulation_text, ifc_file_path, regulation_interpretation, etc."
+        description="Core session information: session_id, regulation_text, ifc_file_path, interpretation, etc."
     )
 
     subgoals: Optional[List[Dict[str, Any]]] = Field(
@@ -23,12 +24,6 @@ class SharedContext(Singleton, BaseModel):
     agent_history: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="Complete ReAct iteration history from ComplianceAgent"
-    )
-
-    # Web search summaries (supports multiple searches without overwriting)
-    search_summaries: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="List of web search summaries with query, result, and timestamp"
     )
 
     # Compliance evaluation result (final assessment)
@@ -55,42 +50,7 @@ class SharedContext(Singleton, BaseModel):
         # Reset session state
         self.subgoals = []
         self.agent_history = []
-        self.search_summaries = []
         self.compliance_result = None
-
-    # === Web search summary methods ===
-
-    def add_search_summary(self, query: str, summary: str) -> None:
-        """Add a web search summary to the list.
-
-        Args:
-            query: The search query used
-            summary: The summarized search result (max ~500 chars)
-        """
-        self.search_summaries.append({
-            "query": query,
-            "summary": summary,
-            "timestamp": datetime.now().isoformat()
-        })
-        print(f"SharedContext: Added search summary for query '{query}' (total: {len(self.search_summaries)})")
-
-    def get_all_summaries(self) -> str:
-        """Get all search summaries as formatted text for LLM consumption.
-
-        Returns:
-            Formatted string with all search summaries, or empty string if none exist
-        """
-        if not self.search_summaries:
-            return ""
-
-        formatted_summaries = []
-        for i, entry in enumerate(self.search_summaries, 1):
-            formatted_summaries.append(
-                f"Search {i}: {entry['query']}\n"
-                f"Result: {entry['summary']}"
-            )
-
-        return "\n\n".join(formatted_summaries)
 
     # === agent_history filtering and query methods ===
 
@@ -102,13 +62,6 @@ class SharedContext(Singleton, BaseModel):
                 entry.get('action_result', {}).get('success'))
         ]
 
-    def get_entries_by_subgoal(self, subgoal_id: int) -> List[Dict[str, Any]]:
-        """Get all agent_history entries related to a specific subgoal ID."""
-        return [
-            entry for entry in self.agent_history
-            if entry.get('active_subgoal_id') == subgoal_id
-        ]
-
     def get_tool_by_name(self, tool_name: str) -> Any:
         """Get the most recent successful tool creation or fix result by tool name.
 
@@ -116,7 +69,8 @@ class SharedContext(Singleton, BaseModel):
             tool_name: Name of the IFC tool to find
 
         Returns:
-            ToolCreatorOutput object if found, None otherwise
+            ToolCreatorOutput object (or dict representation) if found, None otherwise.
+            Both create_ifc_tool and fix_ifc_tool return ToolCreatorOutput for consistency.
         """
         # Traverse agent_history in reverse (most recent first)
         for entry in reversed(self.agent_history):
@@ -207,112 +161,6 @@ class SharedContext(Singleton, BaseModel):
 
         return "\n".join(lines)
 
-    def format_subgoal_history(self, subgoal_id: int) -> str:
-        """Format all history entries for a specific subgoal.
-
-        Args:
-            subgoal_id: The subgoal ID to get history for
-
-        Returns:
-            Formatted string with all actions attempted for this subgoal
-        """
-        entries = self.get_entries_by_subgoal(subgoal_id)
-
-        if not entries:
-            return f"## Subgoal {subgoal_id}: No actions yet"
-
-        lines = [f"## Subgoal {subgoal_id} - Detailed History ({len(entries)} actions)"]
-
-        for entry in entries:
-            action = entry.get('action')
-            iter_num = entry.get('iteration')
-            result = entry.get('action_result', {})
-
-            status_icon = "✓" if result.get('success') else "✗"
-
-            # Basic info
-            line = f"  {status_icon} Iter {iter_num}: {action}"
-
-            # Add brief result info
-            if result.get('success'):
-                if action == 'execute_ifc_tool':
-                    tool_name = result.get('result', {}).get('ifc_tool_name', '')
-                    line += f" ({tool_name})"
-            else:
-                error = result.get('error', '')[:50]
-                line += f" - Error: {error}..."
-
-            lines.append(line)
-
-        return "\n".join(lines)
-
-    def format_planning_history(self) -> str:
-        """Format planning-related actions from agent_history.
-
-        Returns:
-            Formatted string with all planning actions
-        """
-        planning_actions = [
-            'search_and_summarize',
-            'generate_interpretation',
-            'generate_subgoals',
-            'review_and_update_subgoals'
-        ]
-
-        planning_entries = [
-            entry for entry in self.agent_history
-            if entry.get('action') in planning_actions
-        ]
-
-        if not planning_entries:
-            return "## Planning History: No planning actions yet"
-
-        lines = ["## Planning History"]
-        for entry in planning_entries:
-            action = entry['action']
-            iter_num = entry['iteration']
-            result = entry['action_result']
-
-            status_icon = "✓" if result.get('success') else "✗"
-
-            if result.get('success'):
-                lines.append(f"  {status_icon} Iter {iter_num}: {action}")
-            else:
-                error = result.get('error', '')[:50]
-                lines.append(f"  {status_icon} Iter {iter_num}: {action} - Error: {error}...")
-
-        return "\n".join(lines)
-
-    def format_last_action(self) -> str:
-        """Format the last action result from agent_history.
-
-        Returns:
-            Formatted string with last action name and result, or empty string if no history
-        """
-        if not self.agent_history:
-            return ""
-
-        # If last action is auto_generate_report, get the one before it
-        if len(self.agent_history) >= 2 and self.agent_history[-1].get('action') == 'auto_generate_report':
-            last_iteration = self.agent_history[-2]
-        elif len(self.agent_history) >= 1:
-            last_iteration = self.agent_history[-1]
-        else:
-            return ""
-
-        last_action_result = last_iteration.get('action_result', {})
-
-        if last_action_result.get('success'):
-            result_info = f"succeeded with result: {last_action_result.get('result')}"
-        else:
-            result_info = f"failed with error: {last_action_result.get('error')}"
-
-        last_action_text = f"""## Last Action Result
-        Action: {last_iteration.get('action')}
-        Result: {result_info}"""
-
-        return last_action_text
-
     def format_complete_history(self) -> str:
         """Format complete agent_history without filtering or truncation.
 
@@ -345,33 +193,86 @@ class SharedContext(Singleton, BaseModel):
             # Add action and status
             lines.append(f"{status_icon} Action: {action}")
 
-            # Add full action input
+            # Add full action input - use JSON for dicts, str for others
             if action_input:
-                lines.append(f"  Input: {str(action_input)}")
-
-            # Add full result
-            if action_result.get('success'):
-                result = action_result.get('result')
-                if isinstance(result, dict):
-                    if 'ifc_tool_name' in result:
-                        # This is an IFCToolResult - show both tool name and actual result data
-                        tool_name = result.get('ifc_tool_name')
-                        actual_result = result.get('result')  # The actual data returned by the tool
-                        lines.append(f"  Result: Tool '{tool_name}' executed successfully")
-                        if actual_result is not None:
-                            # Truncate very long results to keep context manageable
-                            result_str = str(actual_result)
-                            lines.append(f"  Data: {result_str}")
-                    elif 'subgoals' in result:
-                        # Subgoals result - reference the dedicated Subgoals section
-                        subgoals_list = result.get('subgoals', [])
-                        lines.append(f"  Result: Updated {len(subgoals_list)} subgoals (see Subgoals section above for current status)")
-                    else:
-                        lines.append(f"  Result: {str(result)}")
+                if isinstance(action_input, dict):
+                    try:
+                        input_json = json.dumps(action_input, indent=2, ensure_ascii=False)
+                        lines.append(f"  Input:")
+                        for line in input_json.split('\n'):
+                            lines.append(f"    {line}")
+                    except:
+                        lines.append(f"  Input: {str(action_input)}")
                 else:
-                    lines.append(f"  Result: {str(result)}")
-            else:
-                error = action_result.get('error', '')
-                lines.append(f"  Error: {error}")
+                    lines.append(f"  Input: {str(action_input)}")
+
+            # Add full action_result - show complete JSON for complete transparency
+            # This ensures LLM sees ALL information without any filtering or summarization
+            try:
+                result_json = json.dumps(action_result, indent=2, ensure_ascii=False)
+                lines.append(f"  Action Result:")
+                for line in result_json.split('\n'):
+                    lines.append(f"    {line}")
+            except:
+                # Fallback to str if JSON serialization fails
+                lines.append(f"  Action Result: {str(action_result)}")
 
         return "\n".join(lines)
+
+
+# === Shared formatter for regulation interpretation ===
+
+def format_interpretation(interpretation: RegulationInterpretation) -> Dict[str, str]:
+    """Return formatted interpretation and required-data sections for prompts."""
+    term_clarifications_text = ""
+    for tc in interpretation.term_clarifications:
+        examples = ", ".join(tc.examples) if getattr(tc, "examples", None) else ""
+        notes = getattr(tc, "notes", None)
+        reasoning = getattr(tc, "reasoning_approach", None)  # Optional field
+
+        term_clarifications_text += f"  - {tc.term}: {tc.meaning}\n"
+        if examples:
+            term_clarifications_text += f"    • Examples: {examples}\n"
+        if notes:
+            term_clarifications_text += f"    • Notes: {notes}\n"
+        if reasoning:
+            term_clarifications_text += f"    • Reasoning: {reasoning}\n"
+
+    implicit_requirements_text = "\n".join(
+        [f"  - {item}" for item in interpretation.implicit_requirements]
+    )
+    misunderstandings_text = "\n".join(
+        [f"  - {m}" for m in interpretation.common_misunderstandings]
+    )
+
+    required_data_text = ""
+    if interpretation.required_data:
+        required_data_text = "\n## Required Data for Compliance Checking:\n"
+        for data in interpretation.required_data:
+            required_data_text += f"\n**{data.data_name}** ({', '.join(data.element_types)})\n"
+            required_data_text += f"  - Description: {data.description}\n"
+            sources = ", ".join(getattr(data, "source_candidates", []) or [])
+            required_data_text += f"  - Source candidates: {sources if sources else 'n/a'}\n"
+            required_data_text += f"  - Suggested mapping: {data.suggested_mapping}\n"
+            if getattr(data, "derivation_hints", None):
+                required_data_text += f"  - Derivation hints: {', '.join(data.derivation_hints)}\n"
+
+    interpretation_section = f"""
+## Regulation Interpretation:
+Plain Language:
+{interpretation.plain_language}
+
+Key Terms:
+{term_clarifications_text if term_clarifications_text else "  (none)"}
+
+Implicit Requirements:
+{implicit_requirements_text if implicit_requirements_text else "  (none)"}
+
+Common Misunderstandings to Avoid:
+{misunderstandings_text if misunderstandings_text else "  (none)"}
+"""
+
+    return {
+        "interpretation_section": interpretation_section,
+        "required_data_section": required_data_text,
+    }

@@ -6,55 +6,82 @@ from pydantic import BaseModel, Field
 # === Regulation Interpretation ===
 
 class TermClarification(BaseModel):
-    """Clarification for a specific technical term in a regulation"""
-
+    """Conceptual clarification for a technical term - NO IFC MAPPING"""
     term: str = Field(..., description="The term to clarify")
     meaning: str = Field(..., description="What this term means in the regulation context")
-    ifc_mapping: Optional[str] = Field(None, description="How this term maps to IFC entities/properties (e.g., 'exit → IfcDoor with IsExternal=True')")
-    examples: List[str] = Field(default_factory=list, description="Examples to illustrate the concept")
+    notes: Optional[str] = Field(None, description="notes on its role within the regulation.")
+
+class RequiredData(BaseModel):
+    """Required data for compliance checking with IFC mapping certainty"""
+    data_name: str = Field(..., description="Name of required data (e.g., 'Door egress status', 'Fire rating')")
+    description: str = Field(..., description="What this data represents in regulation context")
+    element_types: List[str] = Field(..., description="Applicable IFC element types (e.g., ['IfcDoor', 'IfcWall'])")
+    source_candidates: List[str] = Field(..., description="Source candidates for this data (e.g., ['IfcPropertySet', 'IfcRelDefinesByProperties'])") 
+    suggested_mapping: Optional[str] = Field(None, description="Primary/recommended IFC property mapping")
+    derivation_hints: Optional[List[str]] = None
+
+
+class EvaluationScope(BaseModel):
+    """Defines the scope and granularity for compliance evaluation"""
+    data_collection_elements: List[str] = Field(..., description="Element types from which to collect data (e.g., ['IfcSpace', 'IfcDoor'])")
+    reporting_component_type: str = Field(..., description="Element type to use as component in compliance report (e.g., 'IfcBuildingStorey', 'IfcSpace', 'IfcDoor')")
+    grouping_rationale: str = Field(..., description="Explanation of why this grouping is used (e.g., 'Regulation checks consistency across spaces within each storey, so each storey is evaluated as one component')")
 
 
 class RegulationInterpretation(BaseModel):
     """Human-readable interpretation of a regulation with disambiguated semantics"""
     plain_language: str = Field(..., description="Simple explanation of the regulation in everyday language (2-3 sentences)")
-    term_clarifications: List[TermClarification] = Field(default_factory=list, description="Clarifications for technical terms and concepts that may be ambiguous")
+    evaluation_scope: Optional[EvaluationScope] = Field(None, description="Defines what elements to collect data from vs. what granularity to report compliance at. Required when data collection and reporting happen at different levels (e.g., collect from spaces but report per storey)")
+    term_clarifications: List[TermClarification] = Field(default_factory=list, description="Clarifications for technical terms and concepts (concept only, no IFC mapping)")
+    implicit_requirements: List[str] = Field(default_factory=list, description="Contextual assumptions needed to interpret the rule")
     common_misunderstandings: List[str] = Field(default_factory=list, description="Common mistakes or misinterpretations to avoid when implementing this check")
+    required_data: List[RequiredData] = Field(default_factory=list, description="All data required for compliance checking with IFC mapping and certainty flags")
 
 
 # === Checker ===
 
+class SimpleCheckedComponent(BaseModel):
+    """Simplified model for compliant/not_applicable components (minimal token usage)"""
+    component_id: str = Field(..., description="IFC GUID or unique component identifier")
+    compliance_status: str = Field(..., description="one of: compliant, not_applicable")
+
+
 class CheckedComponent(BaseModel):
-    """Model for individual IFC component compliance check result"""
+    """Model for individual IFC component compliance check result (full details for violations)"""
     component_id: str = Field(..., description="IFC GUID or unique component identifier")
     component_type: str = Field(..., description="IFC class or category, e.g., IfcDoor, IfcWall")
-    checked_rule: str = Field(..., description="The rule/check being applied")
-    data_used: Dict[str, str] = Field(..., description="Key-value data used for compliance checking")
-    compliance_status: str = Field(..., description="one of: compliant, non_compliant, uncertain")
-    violation_reason: Optional[str] = Field(None, description="Reason for non-compliance if applicable")
-    suggested_fix: Optional[str] = Field(None, description="Optional suggestion to fix non-compliance")
-
-
-class RelationshipCheck(BaseModel):
-    """Model for relationship-based compliance checks between IFC components"""
-    relation_type: str = Field(..., description="Type of relationship being checked (e.g., geometry / topology / semantic)")
-    relation_name: str = Field(..., description="Name of the relationship being checked")
-    involved_components: List[str] = Field(..., description="List of components involved in the relationship")
-    compliance_status: str = Field(..., description="Compliance status of the relationship")
-    analysis_evidence: Optional[Dict[str, str]] = Field(None, description="Evidence supporting the compliance analysis")
-    violation_reason: Optional[str] = Field(None, description="Reason for non-compliance if applicable")
+    data_used: Dict[str, Any] = Field(..., description="Key-value data used for compliance checking (values can be strings, numbers, booleans, etc.)")
+    compliance_status: str = Field(..., description="one of: compliant, non_compliant, not_applicable")
+    violation_reason: Optional[str] = Field(None, description="Reason for non-compliance or not-applicability")
     suggested_fix: Optional[str] = Field(None, description="Optional suggestion to fix non-compliance")
 
 
 class ComplianceEvaluationModel(BaseModel):
-    """Model for compliance evaluation results"""
-    overall_status: str = Field(..., description="Aggregate status: compliant / non_compliant / partial / uncertain / not_applicable")
-    compliant_components: List[CheckedComponent] = Field(..., description="List of compliant components")
-    non_compliant_components: List[CheckedComponent] = Field(..., description="List of non-compliant components")
-    uncertain_components: List[CheckedComponent] = Field(..., description="List of components with uncertain compliance")
-    relationship_checks: Optional[List[RelationshipCheck]] = Field(None, description="List of relationship checks performed")
+    """Model for compliance evaluation results with optimized token usage"""
+    overall_status: str = Field(..., description="One of: 'compliant' (all evaluated components are compliant, not_applicable ignored), 'non_compliant' (at least one component is non-compliant), or 'not_applicable' (all components are not_applicable or no relevant components found).")
+    compliant_components: List[SimpleCheckedComponent] = Field(..., description="REQUIRED: List of all compliant components (simplified format with ID and status only). Must include ALL components checked and found compliant. Empty list only if no compliant components exist.")
+    non_compliant_components: List[CheckedComponent] = Field(..., description="REQUIRED: List of non-compliant components with full details (ID, type, rule, data, violation reason, suggested fix). Must include ALL violations found.")
+    not_applicable_components: List[SimpleCheckedComponent] = Field(..., description="REQUIRED: List of components where requirement is not applicable (simplified format). Must include ALL components where data is missing or requirement doesn't apply.")
+    component_summary: Optional[Dict[str, int]] = Field(None, description="Summary statistics. Contains: total_checked, compliant_count, non_compliant_count, not_applicable_count. Use this to verify all checked components are listed.")
 
 
 # === Agent Tools ===
+
+class ReActIterationOutput(BaseModel):
+    """ReAct iteration output structure for structured LLM response"""
+    thought: str = Field(
+        ...,
+        description="Your reasoning about the current situation and what to do next. Explain your thinking step by step."
+    )
+    action: str = Field(
+        ...,
+        description="The agent tool to call. Must be one of the available tools: generate_subgoals, review_and_update_subgoals, select_ifc_tool, create_ifc_tool, execute_ifc_tool, fix_ifc_tool, store_ifc_tool, make_compliance_judgment, generate_report"
+    )
+    action_input: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Parameters to pass to the tool as a dictionary. Empty dict if no parameters needed."
+    )
+
 
 class AgentToolResult(BaseModel):
     """Standardized result model for agent tool execution"""
@@ -65,15 +92,6 @@ class AgentToolResult(BaseModel):
 
 
 # === Tool Creation ===
-
-class ToolSpec(BaseModel):
-    """Tool requirement specification"""
-    description: str = Field(..., description="Description of what the tool should do")
-    function_name: str = Field(..., description="Name of the function to be created")
-    parameters: List[Dict[str, Any]] = Field(..., description="List of function parameters")
-    return_type: str = Field(..., description="Expected return type of the function")
-    library: str = Field(default="ifcopenshell", description="Primary library used by this tool")
-
 
 class RetrievedDocument(BaseModel):
     """Retrieved document from RAG system"""
@@ -102,10 +120,14 @@ class ToolMetadata(BaseModel):
 
 
 class ToolCreatorOutput(BaseModel):
-    """Output model for tool creation"""
+    """Output model for tool creation and fixing"""
     ifc_tool_name: str = Field(..., description="Tool name, unique identifier")
     code: str = Field(..., description="Python function code as a string")
     metadata: ToolMetadata = Field(..., description="Tool metadata")
+
+    # Optional fields for fix_ifc_tool tracking (None for newly created tools)
+    modification_summary: Optional[str] = Field(None, description="Summary of modifications made (only for fixed tools)")
+    modification_requirement: Optional[str] = Field(None, description="Original modification requirement (only for fixed tools)")
 
 
 # === IFC Tool Execution and Fixing ===
@@ -116,6 +138,7 @@ class IFCToolResult(BaseModel):
     ifc_tool_name: str = Field(..., description="IFC tool name")
     result: Optional[Any] = Field(None, description="Result of code execution if successful")
     parameters_used: Dict[str, Any] = Field(default_factory=dict, description="Parameters used")
+    tool_source: Optional[str] = Field(None, description="Tool origin: 'created' (current session) or 'existing' (pre-existing)")
 
     # Error-related fields (only present when success=False)
     error_message: Optional[str] = Field(None, description="Error message")
@@ -125,8 +148,9 @@ class IFCToolResult(BaseModel):
 
 
 class FixedCodeOutput(BaseModel):
-    """Output model for fixed code"""
-    code: str = Field(..., description="Fixed Python code")
+    """Output model for fixed/modified code"""
+    code: str = Field(..., description="Fixed/modified Python code")
+    summary: str = Field(..., description="Brief explanation of what was changed and why (1-2 sentences)")
 
 
 # === Sandbox Executor ===
@@ -153,7 +177,6 @@ class SubgoalSetModel(BaseModel):
     Note: subgoals can be empty initially in ReAct architecture, as the agent may generate them dynamically during execution.
     """
     subgoals: List[SubgoalModel] = Field(default_factory=list, description="List of subgoals (can be empty initially)")
-    regulation_summary: str = Field(default="", description="Brief summary of the regulation")
 
 
 class AgentResult(BaseModel):
@@ -163,5 +186,6 @@ class AgentResult(BaseModel):
     agent_history: List[Dict[str, Any]] = Field(default_factory=list, description="Complete ReAct history")
     compliance_result: Optional[ComplianceEvaluationModel] = Field(None, description="Final compliance evaluation result")
     error: Optional[str] = Field(None, description="Error message if failed")
+    span_id: Optional[str] = Field(None, description="Phoenix trace span ID for evaluation annotation linking")
 
 

@@ -5,8 +5,111 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Building Code Compliance Check System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/main.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main.css">
+  <script type="module" crossorigin src="/assets/main.js?v=0.6.7"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main.css?v=0.6.7">
+    <style>
+        .example-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .example-btn {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            width: auto;
+        }
+
+        .example-btn:hover {
+            background-color: #f0f0f0;
+        }
+
+        .example-ifc-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .example-ifc-btn {
+            background-color: #444444;
+            color: #ffffff;
+            border: 1px solid #444444;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            width: auto;
+        }
+
+        .example-ifc-btn:hover {
+            background-color: #3a3a3a;
+            border-color: #3a3a3a;
+        }
+
+        .example-ifc-btn:disabled {
+            background-color: #888888;
+            border-color: #888888;
+            cursor: not-allowed;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                height: auto;
+                overflow: auto;
+                overflow-x: hidden;
+            }
+
+            .main-container {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+                width: 100%;
+            }
+
+            .left-panel,
+            .right-panel {
+                width: 100%;
+            }
+
+            .left-panel {
+                height: 45vh;
+                min-height: 260px;
+            }
+
+            .right-panel {
+                padding: 12px;
+                box-shadow: none;
+                box-sizing: border-box;
+            }
+
+            .example-buttons {
+                flex-wrap: nowrap;
+                gap: 6px;
+            }
+
+            .example-btn {
+                flex: 1 1 0;
+                min-width: 0;
+                font-size: 11px;
+                padding: 6px 8px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="main-container">
@@ -16,8 +119,11 @@
             <div id="viewer-overlay">
                 <div class="preview-placeholder" id="preview-placeholder">
                     <i>📁</i>
-                    <div>Drag and drop IFC file here</div>
-                    <div style="font-size: 14px; margin-top: 10px; color: #6c757d;">or click to browse</div>
+                    <div>Upload IFC File</div>
+                    <div class="example-ifc-row">
+                        <span>or</span>
+                        <button id="example-ifc-btn" class="example-ifc-btn" type="button">Use Example IFC Model</button>
+                    </div>
                 </div>
                 <div id="file-info" style="display: none; text-align: center;">
                     <div style="font-size: 48px; margin-bottom: 15px;">✓</div>
@@ -26,6 +132,9 @@
                     <div style="font-size: 12px; color: #999; margin-top: 15px;">Click or drag to change file</div>
                 </div>
             </div>
+            <button id="reupload-btn" class="reupload-btn" style="display: none;">
+                Change File
+            </button>
         </div>
 
         <!-- Right Panel: Form and Results -->
@@ -33,6 +142,10 @@
             <form id="checkForm" enctype="multipart/form-data">
                 <div class="form-group">
                     <textarea id="regulation" name="regulation" placeholder="Enter building code text..." required></textarea>
+                    <div class="example-buttons">
+                        <button type="button" id="example-regulation-btn-1" class="example-btn">Use Example Regulation 1</button>
+                        <button type="button" id="example-regulation-btn-2" class="example-btn">Use Example Regulation 2</button>
+                    </div>
                 </div>
 
                 <input type="file" id="ifc_file" name="ifc_file" accept=".ifc" required style="display: none;">
@@ -47,6 +160,125 @@
             <div id="result" class="result"></div>
         </div>
     </div>
-
+
+    <script>
+        (function () {
+            const exampleRegulationText1 = 'Egress doors shall be of the pivoted or side-hinged swinging type.';
+            const exampleRegulationText2 = 'Where elevators are provided in buildings four or more stories above, or four or more stories below, grade plane, not fewer than one elevator shall provided access to all floors.';
+            const exampleBtn1 = document.getElementById('example-regulation-btn-1');
+            const exampleBtn2 = document.getElementById('example-regulation-btn-2');
+            const regulationInput = document.getElementById('regulation');
+            const exampleIfcBtn = document.getElementById('example-ifc-btn');
+            const ifcInput = document.getElementById('ifc_file');
+            const reuploadBtn = document.getElementById('reupload-btn');
+            const exampleIfcFileName = 'M02_no_space.ifc';
+            const exampleIfcPath = `/examples/ifc/${exampleIfcFileName}`;
+            if (!regulationInput) {
+                return;
+            }
+
+            function applyExample(text) {
+                regulationInput.value = text;
+                regulationInput.focus();
+                regulationInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
+            function hideExampleIfcButton() {
+                if (exampleIfcBtn) {
+                    exampleIfcBtn.style.display = 'none';
+                }
+            }
+
+            function showExampleIfcButton() {
+                if (exampleIfcBtn) {
+                    exampleIfcBtn.style.display = 'block';
+                }
+            }
+
+            function getExampleIfcUrls() {
+                const urls = [exampleIfcPath];
+                const fallbackOrigin = `${window.location.protocol}//${window.location.hostname}:8000`;
+                if (window.location.origin !== fallbackOrigin) {
+                    urls.push(`${fallbackOrigin}${exampleIfcPath}`);
+                }
+                return Array.from(new Set(urls));
+            }
+
+            async function fetchExampleIfcFile() {
+                const urls = getExampleIfcUrls();
+                let lastError = null;
+
+                for (const url of urls) {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`Request failed (${response.status})`);
+                        }
+                        return await response.blob();
+                    } catch (error) {
+                        lastError = error;
+                        console.warn('Example IFC fetch failed:', url, error);
+                    }
+                }
+
+                throw lastError || new Error('Failed to load example IFC model.');
+            }
+
+            if (exampleBtn1) {
+                exampleBtn1.addEventListener('click', () => applyExample(exampleRegulationText1));
+            }
+
+            if (exampleBtn2) {
+                exampleBtn2.addEventListener('click', () => applyExample(exampleRegulationText2));
+            }
+
+            if (reuploadBtn && exampleIfcBtn) {
+                if (reuploadBtn.style.display && reuploadBtn.style.display !== 'none') {
+                    hideExampleIfcButton();
+                } else {
+                    const observer = new MutationObserver(() => {
+                        if (reuploadBtn.style.display && reuploadBtn.style.display !== 'none') {
+                            hideExampleIfcButton();
+                            observer.disconnect();
+                        }
+                    });
+                    observer.observe(reuploadBtn, { attributes: true, attributeFilter: ['style', 'class'] });
+                }
+
+                reuploadBtn.addEventListener('click', () => {
+                    showExampleIfcButton();
+                });
+            }
+
+            if (exampleIfcBtn && ifcInput) {
+                exampleIfcBtn.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const originalText = exampleIfcBtn.textContent;
+                    exampleIfcBtn.disabled = true;
+                    exampleIfcBtn.textContent = 'Loading example IFC...';
+
+                    try {
+                        const blob = await fetchExampleIfcFile();
+                        const file = new File([blob], exampleIfcFileName, {
+                            type: blob.type || 'application/octet-stream'
+                        });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        ifcInput.files = dataTransfer.files;
+                        ifcInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    } catch (error) {
+                        console.error('Example IFC load error:', error);
+                        alert('Failed to load example IFC model. Please make sure the backend is running.');
+                    } finally {
+                        exampleIfcBtn.disabled = false;
+                        exampleIfcBtn.textContent = originalText;
+                    }
+                });
+            }
+        })();
+    </script>
+
 </body>
 </html>
