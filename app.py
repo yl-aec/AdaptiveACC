@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Optional, Dict
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
@@ -88,6 +89,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Enable gzip to speed up large text responses like IFC files.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # Configure templates
 templates = Jinja2Templates(directory="templates")
