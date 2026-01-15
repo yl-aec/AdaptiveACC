@@ -1,4 +1,5 @@
 from toolregistry import ToolRegistry
+from inspect import signature
 from utils.base_classes import Singleton
 
 
@@ -9,6 +10,24 @@ class AgentToolRegistry(Singleton):
         """Initialize AgentToolRegistry instance"""
         # Create and manage the global ToolRegistry
         self.registry = ToolRegistry()
+        self._patch_toolregistry_api_format()
+
+    def _patch_toolregistry_api_format(self):
+        """Add a backward-compatible get_tools_json wrapper if api_format is unsupported."""
+        try:
+            if "api_format" in signature(ToolRegistry.get_tools_json).parameters:
+                return
+        except Exception:
+            # If signature inspection fails, be conservative and wrap.
+            pass
+
+        original_get_tools_json = ToolRegistry.get_tools_json
+
+        def compat_get_tools_json(self, *args, **kwargs):
+            kwargs.pop("api_format", None)
+            return original_get_tools_json(self, *args, **kwargs)
+
+        ToolRegistry.get_tools_json = compat_get_tools_json
 
     # Proxy methods to underlying ToolRegistry
     def get_available_tools(self):
@@ -17,11 +36,7 @@ class AgentToolRegistry(Singleton):
 
     def get_tools_json(self, api_format="openai-chatcompletion"):
         """Get tools schema in JSON format"""
-        try:
-            return self.registry.get_tools_json(api_format=api_format)
-        except TypeError:
-            # Older toolregistry versions do not accept api_format.
-            return self.registry.get_tools_json()
+        return self.registry.get_tools_json(api_format=api_format)
 
     def execute_tool_calls(self, tool_calls):
         """Execute tool calls"""
