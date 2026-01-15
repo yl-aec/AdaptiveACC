@@ -639,6 +639,12 @@ function formatFriendlyOutput(actionResult, action, actionInput) {
         return html;
     }
 
+    if (actionResult.success === false) {
+        const actionLabel = actionName.replace(/_/g, ' ');
+        html += `<div class="output-item error">Failed to ${escapeHtml(actionLabel)}</div>`;
+        return html;
+    }
+
     // Generate action-specific descriptions
     if (actionName.includes('select') && actionName.includes('tool')) {
         // Tool selection
