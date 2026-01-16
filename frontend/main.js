@@ -26,7 +26,9 @@ const apiKeyInput = document.getElementById('api_key');
 const stopBtn = document.getElementById('stopBtn');
 const exampleIfcFileName = 'M02_no_space.ifc';
 const exampleIfcPath = `/examples/ifc/${exampleIfcFileName}`;
-const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches
+    || window.innerWidth <= 900
+    || (navigator && navigator.maxTouchPoints > 0);
 let currentSessionId = null;
 
 function getRenderPixelRatio() {
