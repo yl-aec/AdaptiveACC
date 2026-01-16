@@ -159,6 +159,8 @@ async def start_compliance_check(
             raise HTTPException(status_code=422, detail=f"Invalid regulation text: {str(e)}")
 
         api_key = api_key.strip() if api_key and api_key.strip() else None
+        if ifc_file is not None and not ifc_file.filename:
+            ifc_file = None
 
         # Generate unique session ID
         session_id = str(uuid.uuid4())[:8]
@@ -275,8 +277,10 @@ async def start_compliance_check(
         # Return session ID immediately
         return {"session_id": session_id}
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error starting check: {e}")
+        print(f"Error starting check: {e!r}")
         raise HTTPException(status_code=500, detail=f"Failed to start check: {str(e)}")
 
 @app.websocket("/ws/{session_id}")
