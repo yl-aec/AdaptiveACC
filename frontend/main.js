@@ -16,6 +16,7 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const fileSizeDisplay = document.getElementById('file-size-display');
 const reuploadBtn = document.getElementById('reupload-btn');
 const exampleIfcBtn = document.getElementById('example-ifc-btn');
+const useExampleIfcInput = document.getElementById('use_example_ifc');
 const regulationInput = document.getElementById('regulation');
 const exampleRegulationBtn1 = document.getElementById('example-regulation-btn-1');
 const exampleRegulationBtn2 = document.getElementById('example-regulation-btn-2');
@@ -30,6 +31,15 @@ const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)
     || window.innerWidth <= 900
     || (navigator && navigator.maxTouchPoints > 0);
 let currentSessionId = null;
+
+function setUseExampleIfc(enabled) {
+    if (useExampleIfcInput) {
+        useExampleIfcInput.value = enabled ? 'true' : '';
+    }
+    if (fileInput) {
+        fileInput.required = !enabled;
+    }
+}
 
 function getRenderPixelRatio() {
     const maxRatio = isLowPerfDevice ? 1 : 1.5;
@@ -193,6 +203,7 @@ function setupFileHandling() {
 
         // Reset file input
         fileInput.value = '';
+        setUseExampleIfc(false);
 
         // Show upload overlay again
         overlay.style.display = 'flex';
@@ -237,6 +248,20 @@ function setupExampleIfcModel() {
     exampleIfcBtn.addEventListener('click', async (event) => {
         event.preventDefault();
         event.stopPropagation();
+
+        if (isLowPerfDevice) {
+            setUseExampleIfc(true);
+            fileInput.value = '';
+            placeholder.style.display = 'none';
+            fileInfo.style.display = 'block';
+            overlay.classList.add('has-file');
+            fileNameDisplay.textContent = exampleIfcFileName;
+            fileSizeDisplay.textContent = 'Size: server-side example';
+            if (reuploadBtn) {
+                reuploadBtn.style.display = 'block';
+            }
+            return;
+        }
 
         const originalText = exampleIfcBtn.textContent;
         exampleIfcBtn.disabled = true;
@@ -329,10 +354,15 @@ function setupStopButton() {
 }
 
 function handleFile(file) {
-    // Update file input
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
-    fileInput.files = dataTransfer.files;
+    setUseExampleIfc(false);
+    if (fileInput) {
+        const shouldSyncInput = !fileInput.files || !fileInput.files.length || fileInput.files[0] !== file;
+        if (shouldSyncInput) {
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+        }
+    }
 
     // Update UI
     placeholder.style.display = 'none';

@@ -146,8 +146,9 @@ async def serve_example_ifc(file_name: str):
 @app.post("/check/start")
 async def start_compliance_check(
     regulation: str = Form(..., description="Building code text"),
-    ifc_file: UploadFile = File(..., description="IFC file"),
-    api_key: Optional[str] = Form(None, description="Optional API key override")
+    ifc_file: Optional[UploadFile] = File(None, description="IFC file"),
+    api_key: Optional[str] = Form(None, description="Optional API key override"),
+    use_example_ifc: Optional[str] = Form(None, description="Use server example IFC")
 ):
     """Start compliance check and return session ID for WebSocket connection"""
     try:
@@ -157,23 +158,38 @@ async def start_compliance_check(
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Invalid regulation text: {str(e)}")
 
-        # Validate file type
-        if not ifc_file.filename.lower().endswith('.ifc'):
-            raise HTTPException(status_code=400, detail="Only IFC file format is supported")
-
         api_key = api_key.strip() if api_key and api_key.strip() else None
-
-        # Save uploaded file
-        file_path = os.path.join(Config.UPLOAD_DIR, ifc_file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(ifc_file.file, buffer)
-
-        print(f"File saved: {file_path}")
-        print(f"Code text: {request_data.regulation[:100]}...")
 
         # Generate unique session ID
         session_id = str(uuid.uuid4())[:8]
         print(f"[Session] Created session: {session_id}")
+
+        use_example_flag = False
+        if use_example_ifc is not None:
+            use_example_flag = str(use_example_ifc).lower() in ("1", "true", "yes")
+
+        if use_example_flag and ifc_file is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            example_name = "M02_no_space.ifc"
+            example_file = os.path.join(base_dir, "dataset", "ifc_models", example_name)
+            if not os.path.exists(example_file):
+                raise HTTPException(status_code=404, detail="Example IFC not found on server")
+            file_path = os.path.join(Config.UPLOAD_DIR, f"{session_id}_{example_name}")
+            shutil.copyfile(example_file, file_path)
+        else:
+            if ifc_file is None:
+                raise HTTPException(status_code=400, detail="IFC file is required")
+            # Validate file type
+            if not ifc_file.filename.lower().endswith('.ifc'):
+                raise HTTPException(status_code=400, detail="Only IFC file format is supported")
+
+            # Save uploaded file
+            file_path = os.path.join(Config.UPLOAD_DIR, f"{session_id}_{ifc_file.filename}")
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(ifc_file.file, buffer)
+
+        print(f"File saved: {file_path}")
+        print(f"Code text: {request_data.regulation[:100]}...")
 
         # Create message queue for this session
         message_queue = asyncio.Queue(maxsize=1000)

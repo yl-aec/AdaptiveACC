@@ -6,8 +6,8 @@
     <title>Building Code Compliance Check System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <script type="module" crossorigin src="/assets/main.js?v=0.8.6"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main.css?v=0.8.6">
+  <script type="module" crossorigin src="/assets/main.js?v=0.8.7"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main.css?v=0.8.7">
     <style>
         .example-buttons {
             display: flex;
@@ -162,6 +162,7 @@
                 </div>
 
                 <input type="file" id="ifc_file" name="ifc_file" accept=".ifc" required style="display: none;">
+                <input type="hidden" id="use_example_ifc" name="use_example_ifc" value="">
 
                 <button type="submit" id="submitBtn">Start Check</button>
                 <button type="button" id="stopBtn" class="stop-btn" style="display: none;">Cancel Check</button>
@@ -185,8 +186,17 @@
             const exampleIfcBtn = document.getElementById('example-ifc-btn');
             const ifcInput = document.getElementById('ifc_file');
             const reuploadBtn = document.getElementById('reupload-btn');
+            const useExampleIfcInput = document.getElementById('use_example_ifc');
+            const placeholder = document.getElementById('preview-placeholder');
+            const fileInfo = document.getElementById('file-info');
+            const fileNameDisplay = document.getElementById('file-name-display');
+            const fileSizeDisplay = document.getElementById('file-size-display');
+            const overlay = document.getElementById('viewer-overlay');
             const exampleIfcFileName = 'M02_no_space.ifc';
             const exampleIfcPath = `/examples/ifc/${exampleIfcFileName}`;
+            const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches
+                || window.innerWidth <= 900
+                || (navigator && navigator.maxTouchPoints > 0);
             if (!regulationInput) {
                 return;
             }
@@ -206,6 +216,15 @@
             function showExampleIfcButton() {
                 if (exampleIfcBtn) {
                     exampleIfcBtn.style.display = 'block';
+                }
+            }
+
+            function setUseExampleIfc(enabled) {
+                if (useExampleIfcInput) {
+                    useExampleIfcInput.value = enabled ? 'true' : '';
+                }
+                if (ifcInput) {
+                    ifcInput.required = !enabled;
                 }
             }
 
@@ -260,6 +279,7 @@
                 }
 
                 reuploadBtn.addEventListener('click', () => {
+                    setUseExampleIfc(false);
                     showExampleIfcButton();
                 });
             }
@@ -268,6 +288,30 @@
                 exampleIfcBtn.addEventListener('click', async (event) => {
                     event.preventDefault();
                     event.stopPropagation();
+
+                    if (isLowPerfDevice) {
+                        setUseExampleIfc(true);
+                        ifcInput.value = '';
+                        if (placeholder) {
+                            placeholder.style.display = 'none';
+                        }
+                        if (fileInfo) {
+                            fileInfo.style.display = 'block';
+                        }
+                        if (overlay) {
+                            overlay.classList.add('has-file');
+                        }
+                        if (fileNameDisplay) {
+                            fileNameDisplay.textContent = exampleIfcFileName;
+                        }
+                        if (fileSizeDisplay) {
+                            fileSizeDisplay.textContent = 'Size: server-side example';
+                        }
+                        if (reuploadBtn) {
+                            reuploadBtn.style.display = 'block';
+                        }
+                        return;
+                    }
 
                     const originalText = exampleIfcBtn.textContent;
                     exampleIfcBtn.disabled = true;
