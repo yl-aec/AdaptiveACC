@@ -18,6 +18,8 @@ class LocalPythonExecutor:
     def __init__(self, timeout: int = 30, max_memory_mb: int = 512):
         self.timeout = timeout
         self.max_memory_mb = max_memory_mb
+        # Fallback for older ifcopenshell builds that lack certain helpers.
+        get_openings = getattr(ifcopenshell.util.element, "get_openings", lambda *_, **__: [])
         # Add print function and other basic functions to allowed functions
         additional_functions = {
             # Basic Python functions
@@ -56,7 +58,7 @@ class LocalPythonExecutor:
             'get_contained': ifcopenshell.util.element.get_contained,
 
             # Opening relationships
-            'get_openings': ifcopenshell.util.element.get_openings,
+            'get_openings': get_openings,
             'get_filled_void': ifcopenshell.util.element.get_filled_void,
             'get_voided_element': ifcopenshell.util.element.get_voided_element,
 
