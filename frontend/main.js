@@ -29,7 +29,8 @@ const exampleIfcFileName = 'M02_no_space.ifc';
 const exampleIfcPath = `/examples/ifc/${exampleIfcFileName}`;
 const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches
     || window.innerWidth <= 900
-    || (navigator && navigator.maxTouchPoints > 0);
+    || (navigator && navigator.maxTouchPoints > 0)
+    || (navigator && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
 let currentSessionId = null;
 
 function setUseExampleIfc(enabled) {
@@ -256,7 +257,7 @@ function setupExampleIfcModel() {
             fileInfo.style.display = 'block';
             overlay.classList.add('has-file');
             fileNameDisplay.textContent = exampleIfcFileName;
-            fileSizeDisplay.textContent = 'Size: server-side example';
+            fileSizeDisplay.textContent = 'Example IFC loaded (server) · Ready to check';
             if (reuploadBtn) {
                 reuploadBtn.style.display = 'block';
             }

@@ -6,8 +6,8 @@
     <title>Building Code Compliance Check System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <script type="module" crossorigin src="/assets/main.js?v=0.8.7"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main.css?v=0.8.7">
+  <script type="module" crossorigin src="/assets/main.js?v=0.8.8"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main.css?v=0.8.8">
     <style>
         .example-buttons {
             display: flex;
@@ -196,7 +196,8 @@
             const exampleIfcPath = `/examples/ifc/${exampleIfcFileName}`;
             const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches
                 || window.innerWidth <= 900
-                || (navigator && navigator.maxTouchPoints > 0);
+                || (navigator && navigator.maxTouchPoints > 0)
+                || (navigator && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
             if (!regulationInput) {
                 return;
             }
@@ -288,6 +289,7 @@
                 exampleIfcBtn.addEventListener('click', async (event) => {
                     event.preventDefault();
                     event.stopPropagation();
+                    event.stopImmediatePropagation();
 
                     if (isLowPerfDevice) {
                         setUseExampleIfc(true);
@@ -305,7 +307,7 @@
                             fileNameDisplay.textContent = exampleIfcFileName;
                         }
                         if (fileSizeDisplay) {
-                            fileSizeDisplay.textContent = 'Size: server-side example';
+                            fileSizeDisplay.textContent = 'Example IFC loaded (server) · Ready to check';
                         }
                         if (reuploadBtn) {
                             reuploadBtn.style.display = 'block';
