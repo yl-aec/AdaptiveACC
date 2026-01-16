@@ -181,7 +181,7 @@ class SubgoalSetModel(BaseModel):
 
 class AgentResult(BaseModel):
     """ReAct agent execution result"""
-    status: Literal["success", "timeout", "failed"] = Field(..., description="Execution status")
+    status: Literal["success", "timeout", "failed", "cancelled"] = Field(..., description="Execution status")
     iterations_used: int = Field(..., description="Number of ReAct iterations used")
     agent_history: List[Dict[str, Any]] = Field(default_factory=list, description="Complete ReAct history")
     compliance_result: Optional[ComplianceEvaluationModel] = Field(None, description="Final compliance evaluation result")

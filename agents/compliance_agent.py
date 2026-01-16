@@ -1,5 +1,6 @@
 
 import uuid
+import threading
 from typing import Dict, List, Any, Optional, Callable
 from config import Config
 from utils.llm_client import LLMClient
@@ -26,11 +27,18 @@ from telemetry.tracing import trace_method
 class ComplianceAgent:
     """Main agent for compliance checking using ReAct framework with 8 agent tools"""
 
-    def __init__(self, iteration_callback: Optional[Callable] = None):
-        self.llm_client = LLMClient()
+    def __init__(
+        self,
+        iteration_callback: Optional[Callable] = None,
+        api_key: Optional[str] = None,
+        cancel_event: Optional[threading.Event] = None
+    ):
+        self.api_key = api_key.strip() if api_key and api_key.strip() else None
+        self.llm_client = LLMClient(api_key=self.api_key)
         self.shared_context = SharedContext.get_instance()
         self.agent_tool_registry = AgentToolRegistry.get_instance()
         self.iteration_callback = iteration_callback
+        self.cancel_event = cancel_event
 
         # Register agent tools
         self._register_required_tools()
@@ -104,6 +112,20 @@ class ComplianceAgent:
         session_id = str(uuid.uuid4())[:8]
         print(f"\nComplianceAgent: Session {session_id} initialized")
         self.shared_context.initialize_session(session_id, regulation_text, ifc_file_path)
+        if self.api_key:
+            self.shared_context.session_info["api_key_override"] = self.api_key
+        else:
+            self.shared_context.session_info.pop("api_key_override", None)
+        self.shared_context.session_info.pop("last_llm_error", None)
+        self.shared_context.session_info.pop("last_llm_error_is_quota", None)
+        if self._is_cancelled():
+            return AgentResult(
+                status="cancelled",
+                iterations_used=0,
+                agent_history=self.shared_context.agent_history,
+                error="Cancelled by user",
+                span_id=self._extract_span_id()
+            )
 
         # Store sample metadata in SharedContext for potential use
         if sample_id:
@@ -146,6 +168,14 @@ class ComplianceAgent:
         max_empty_retries = 10  
 
         while iteration < max_iterations:
+            if self._is_cancelled():
+                return AgentResult(
+                    status="cancelled",
+                    iterations_used=iteration,
+                    agent_history=self.shared_context.agent_history,
+                    error="Cancelled by user",
+                    span_id=self._extract_span_id()
+                )
             print(f"\n{'='*60}")
             print(f"ReAct Iteration {iteration + 1}/{max_iterations}")
             print(f"{'='*60}")
@@ -159,11 +189,21 @@ class ComplianceAgent:
 
                 if retry_count >= max_empty_retries:
                     print(f"[ERROR] {max_empty_retries} consecutive empty iterations - failing")
+                    last_llm_error = self.shared_context.session_info.get("last_llm_error")
+                    error_message = last_llm_error or f"LLM stopped calling tools after {max_empty_retries} attempts"
+                    quota_error = self.shared_context.session_info.get("last_llm_error_is_quota")
+                    api_key_override = self.shared_context.session_info.get("api_key_override")
+                    if quota_error and not api_key_override:
+                        error_message = (
+                            "System API credits are insufficient. Please enable 'Use my API key' and try again."
+                        )
+                        if last_llm_error:
+                            error_message = f"{error_message} Details: {last_llm_error}"
                     return AgentResult(
                         status="failed",
                         iterations_used=iteration,
                         agent_history=self.shared_context.agent_history,
-                        error=f"LLM stopped calling tools after {max_empty_retries} attempts",
+                        error=error_message,
                         span_id=self._extract_span_id()
                     )
                 continue  # Retry without incrementing iteration
@@ -175,6 +215,15 @@ class ComplianceAgent:
             if result:  # Task completed or failed
                 return result
 
+            if self._is_cancelled():
+                return AgentResult(
+                    status="cancelled",
+                    iterations_used=iteration,
+                    agent_history=self.shared_context.agent_history,
+                    error="Cancelled by user",
+                    span_id=self._extract_span_id()
+                )
+
         # 3. Handle timeout
         print(f"\n[WARNING] Exceeded maximum iterations ({max_iterations})")
         return AgentResult(
@@ -184,6 +233,9 @@ class ComplianceAgent:
             error=f"Exceeded maximum iterations ({max_iterations})",
             span_id=self._extract_span_id()
         )
+
+    def _is_cancelled(self) -> bool:
+        return bool(self.cancel_event and self.cancel_event.is_set())
 
 
     # === Core ReAct Logic ===

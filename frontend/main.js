@@ -21,9 +21,13 @@ const exampleRegulationBtn1 = document.getElementById('example-regulation-btn-1'
 const exampleRegulationBtn2 = document.getElementById('example-regulation-btn-2');
 const exampleRegulationText1 = 'Egress doors shall be of the pivoted or side-hinged swinging type.';
 const exampleRegulationText2 = 'Where elevators are provided in buildings four or more stories above, or four or more stories below, grade plane, not fewer than one elevator shall provided access to all floors.';
+const apiKeyToggle = document.getElementById('use-user-key');
+const apiKeyInput = document.getElementById('api_key');
+const stopBtn = document.getElementById('stopBtn');
 const exampleIfcFileName = 'M02_no_space.ifc';
 const exampleIfcPath = `/examples/ifc/${exampleIfcFileName}`;
 const isLowPerfDevice = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+let currentSessionId = null;
 
 function getRenderPixelRatio() {
     const maxRatio = isLowPerfDevice ? 1 : 1.5;
@@ -255,6 +259,73 @@ function setupExampleIfcModel() {
     });
 }
 
+function setupApiKeyToggle() {
+    if (!apiKeyToggle || !apiKeyInput) {
+        return;
+    }
+
+    const syncState = () => {
+        if (apiKeyToggle.checked) {
+            apiKeyInput.readOnly = false;
+            apiKeyInput.removeAttribute('readonly');
+            apiKeyInput.setAttribute('aria-disabled', 'false');
+            apiKeyInput.focus();
+        } else {
+            apiKeyInput.value = '';
+            apiKeyInput.readOnly = true;
+            apiKeyInput.setAttribute('readonly', 'readonly');
+            apiKeyInput.setAttribute('aria-disabled', 'true');
+        }
+    };
+
+    apiKeyToggle.addEventListener('change', syncState);
+    syncState();
+}
+
+function setStopButtonState(isChecking) {
+    if (!stopBtn) {
+        return;
+    }
+
+    if (isChecking) {
+        stopBtn.style.display = 'block';
+        stopBtn.disabled = false;
+        stopBtn.textContent = 'Cancel Check';
+    } else {
+        stopBtn.style.display = 'none';
+        stopBtn.disabled = false;
+        stopBtn.textContent = 'Cancel Check';
+    }
+}
+
+function setupStopButton() {
+    if (!stopBtn) {
+        return;
+    }
+
+    stopBtn.addEventListener('click', async () => {
+        if (!currentSessionId) {
+            return;
+        }
+
+        stopBtn.disabled = true;
+        stopBtn.textContent = 'Cancelling...';
+
+        try {
+            const formData = new FormData();
+            formData.append('session_id', currentSessionId);
+            await fetch('/check/stop', {
+                method: 'POST',
+                body: formData
+            });
+        } catch (error) {
+            console.error('[Client] Stop request failed:', error);
+            stopBtn.disabled = false;
+            stopBtn.textContent = 'Cancel Check';
+        }
+    });
+}
+
 function handleFile(file) {
     // Update file input
     const dataTransfer = new DataTransfer();
@@ -268,7 +339,16 @@ function handleFile(file) {
 
     fileNameDisplay.textContent = file.name;
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-    fileSizeDisplay.textContent = `Size: ${sizeInMB} MB`;
+    const sizeLabel = `Size: ${sizeInMB} MB`;
+    if (isLowPerfDevice) {
+        fileSizeDisplay.textContent = `${sizeLabel} - 3D preview disabled on mobile`;
+        console.log('File selected (mobile preview disabled):', file.name);
+        if (reuploadBtn) {
+            reuploadBtn.style.display = 'block';
+        }
+        return;
+    }
+    fileSizeDisplay.textContent = sizeLabel;
 
     console.log('File selected:', file.name);
 
@@ -1101,6 +1181,13 @@ function handleCompletion(message) {
 
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = false;
+    currentSessionId = null;
+    setStopButtonState(false);
+
+    if (message.status === 'cancelled') {
+        handleCancelled(message);
+        return;
+    }
 
     // Update progress bar to 100%
     const progressBar = document.getElementById('subgoal-progress-bar');
@@ -1119,6 +1206,14 @@ function handleCompletion(message) {
     } else if (message.error) {
         handleError({ error: message.error });
     }
+}
+
+function handleCancelled(message) {
+    const result = document.getElementById('result');
+    result.className = 'result show';
+    result.innerHTML = `
+        <h3>Check Cancelled</h3>
+    `;
 }
 
 function displayFinalReport(result) {
@@ -1182,10 +1277,11 @@ function handleError(message) {
     result.innerHTML = `
         <h3>Check Failed</h3>
         <p style="color: #c9736c">${escapeHtml(message.error)}</p>
-        <button onclick="location.reload()">Retry</button>
     `;
 
     document.getElementById('submitBtn').disabled = false;
+    currentSessionId = null;
+    setStopButtonState(false);
 }
 
 // Form submission with WebSocket real-time updates
@@ -1201,6 +1297,9 @@ function setupFormSubmission() {
 
         try {
             const formData = new FormData(this);
+            if (!apiKeyToggle || !apiKeyToggle.checked) {
+                formData.delete('api_key');
+            }
 
             // Step 1: Start compliance check and get session ID
             const response = await fetch('/check/start', {
@@ -1213,6 +1312,8 @@ function setupFormSubmission() {
             }
 
             const { session_id } = await response.json();
+            currentSessionId = session_id;
+            setStopButtonState(true);
             console.log('[Client] Session started:', session_id);
 
             // Step 2: Initialize progress UI
@@ -1238,6 +1339,8 @@ function setupFormSubmission() {
             result.innerHTML = `<h3>Check Failed</h3><p>Error: ${error.message}</p>`;
             submitBtn.disabled = false;
             loading.style.display = 'none';
+            currentSessionId = null;
+            setStopButtonState(false);
         }
     });
 }
@@ -1247,4 +1350,6 @@ initViewer();
 setupFileHandling();
 setupExampleRegulation();
 setupExampleIfcModel();
+setupApiKeyToggle();
+setupStopButton();
 setupFormSubmission();

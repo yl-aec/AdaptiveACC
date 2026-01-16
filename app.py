@@ -3,6 +3,7 @@ import shutil
 import time
 import uuid
 import asyncio
+import threading
 from contextlib import asynccontextmanager
 from typing import Optional, Dict
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -34,6 +35,7 @@ compliance_agent = None
 
 # WebSocket session management
 active_sessions: Dict[str, asyncio.Queue] = {}
+cancel_events: Dict[str, threading.Event] = {}
 
 # Initialize system components
 def initialize_system():
@@ -144,7 +146,8 @@ async def serve_example_ifc(file_name: str):
 @app.post("/check/start")
 async def start_compliance_check(
     regulation: str = Form(..., description="Building code text"),
-    ifc_file: UploadFile = File(..., description="IFC file")
+    ifc_file: UploadFile = File(..., description="IFC file"),
+    api_key: Optional[str] = Form(None, description="Optional API key override")
 ):
     """Start compliance check and return session ID for WebSocket connection"""
     try:
@@ -157,6 +160,8 @@ async def start_compliance_check(
         # Validate file type
         if not ifc_file.filename.lower().endswith('.ifc'):
             raise HTTPException(status_code=400, detail="Only IFC file format is supported")
+
+        api_key = api_key.strip() if api_key and api_key.strip() else None
 
         # Save uploaded file
         file_path = os.path.join(Config.UPLOAD_DIR, ifc_file.filename)
@@ -173,6 +178,8 @@ async def start_compliance_check(
         # Create message queue for this session
         message_queue = asyncio.Queue(maxsize=1000)
         active_sessions[session_id] = message_queue
+        cancel_event = threading.Event()
+        cancel_events[session_id] = cancel_event
 
         # Get event loop reference BEFORE creating callback
         event_loop = asyncio.get_event_loop()
@@ -201,7 +208,11 @@ async def start_compliance_check(
                 start_time = time.time()
 
                 # Create agent instance with callback
-                agent = ComplianceAgent(iteration_callback=iteration_callback)
+                agent = ComplianceAgent(
+                    iteration_callback=iteration_callback,
+                    api_key=api_key,
+                    cancel_event=cancel_event
+                )
 
                 # Run agent in executor (non-blocking)
                 loop = asyncio.get_event_loop()
@@ -299,6 +310,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         # Cleanup session after delay
         asyncio.create_task(cleanup_session(session_id, delay=60))
 
+@app.post("/check/stop")
+async def stop_compliance_check(session_id: str = Form(..., description="Session ID")):
+    """Request to stop a running compliance check session."""
+    cancel_event = cancel_events.get(session_id)
+    if not cancel_event:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    cancel_event.set()
+    return {"status": "cancel_requested", "session_id": session_id}
+
 
 async def cleanup_session(session_id: str, delay: int = 60):
     """Remove session after delay to prevent memory leaks"""
@@ -306,6 +327,7 @@ async def cleanup_session(session_id: str, delay: int = 60):
     if session_id in active_sessions:
         print(f"[Cleanup] Removing session: {session_id}")
         active_sessions.pop(session_id)
+    cancel_events.pop(session_id, None)
 
 
 @app.get("/health", response_model=HealthCheckResponse)

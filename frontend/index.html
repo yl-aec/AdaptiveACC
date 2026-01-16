@@ -44,9 +44,22 @@
                     </div>
                 </div>
 
+                <div class="api-key-section">
+                    <label class="api-key-toggle">
+                        <input
+                            type="checkbox"
+                            id="use-user-key"
+                            onchange="const input=document.getElementById('api_key'); if (input) { if (this.checked) { input.readOnly=false; input.removeAttribute('readonly'); input.setAttribute('aria-disabled','false'); input.focus(); } else { input.value=''; input.readOnly=true; input.setAttribute('readonly','readonly'); input.setAttribute('aria-disabled','true'); } }"
+                        >
+                        Use my API key
+                    </label>
+                    <input type="password" id="api_key" name="api_key" class="api-key-input" placeholder="Paste a Gemini or OpenRouter API key" autocomplete="off" readonly aria-disabled="true">
+                </div>
+
                 <input type="file" id="ifc_file" name="ifc_file" accept=".ifc" required style="display: none;">
 
                 <button type="submit" id="submitBtn">Start Check</button>
+                <button type="button" id="stopBtn" class="stop-btn" style="display: none;">Stop Check</button>
             </form>
 
             <div id="loading" class="loading" style="display: none;">
