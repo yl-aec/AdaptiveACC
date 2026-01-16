@@ -122,7 +122,10 @@ class IFCToolRegistry(Singleton):
     
     def get_tools_json(self, api_format="openai-chatcompletion"):
         """Get tools schema in JSON format"""
-        return self.registry.get_tools_json(api_format=api_format)
+        try:
+            return self.registry.get_tools_json(api_format=api_format)
+        except TypeError:
+            return self.registry.get_tools_json()
     
     def execute_tool_calls(self, tool_calls):
         """Execute tool calls"""
