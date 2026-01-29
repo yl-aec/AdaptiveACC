@@ -6,9 +6,9 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/blau1234/AdaptiveACC)
 
 <p align="center">
-  <video controls width="80%">
-    <source src="images/video.mp4" type="video/mp4">
-  </video>
+  <a href="images/video.mp4">
+    <img src="images/video%20cover.png" width="80%" alt="Demo Video">
+  </a>
 </p>
 
 
