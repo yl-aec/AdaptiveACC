@@ -5,6 +5,12 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/blau1234/AdaptiveACC)
 
+<p align="center">
+  <video controls width="80%">
+    <source src="images/video.mp4" type="video/mp4">
+  </video>
+</p>
+
 
 <h3>Overview</h3>
 
