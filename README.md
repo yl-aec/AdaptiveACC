@@ -5,12 +5,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/blau1234/AdaptiveACC)
 
-<p align="center">
-  <a href="images/video.mp4">
-    <img src="images/video%20cover.png" width="80%" alt="Demo Video">
-  </a>
-</p>
-
 
 <h3>Overview</h3>
 
@@ -23,7 +17,7 @@
 <h3>System Architecture</h3>
 
 <p align="center">
-  <img src="images/architecture.svg" alt="System Architecture" width="100%">
+  <img src="images/architecture.svg" alt="System Architecture" width="800%">
 </p>
 
 <small>The system implements a <strong>single-agent ReAct architecture</strong> where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.</small>
@@ -54,7 +48,7 @@
 
 <h3>How It Works: Three-Phase Workflow</h3>
 <p align="center">
-  <img src="images/workflow.svg" alt="workflow" width="100%">
+  <img src="images/workflow.svg" alt="workflow" width="80%">
 </p>
 
 <h4>Phase 1: Task Decomposition</h4>
