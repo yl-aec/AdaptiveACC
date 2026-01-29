@@ -17,7 +17,7 @@
 <h4>System Architecture</h4>
 
 <p align="center">
-  <img src="images/architecture.png" alt="System Architecture" width="100%">
+  <img src="images/architecture.png" alt="System Architecture" width="80%">
 </p>
 
 <small>The system implements a <strong>single-agent ReAct architecture</strong> where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.</small>
@@ -48,7 +48,7 @@
 
 <h4>How It Works: Three-Phase Workflow</h4>
 <p align="center">
-  <img src="images/workflow.png" alt="workflow" width="100%">
+  <img src="images/workflow.png" alt="workflow" width="80%">
 </p>
 
 <h5>Phase 1: Task Decomposition</h5>
