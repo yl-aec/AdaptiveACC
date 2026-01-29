@@ -10,60 +10,57 @@
 
 <small>The ACC System transforms building code compliance checking from a manual, time-consuming process into an automated workflow powered by agentic AI. By leveraging Large Language Models (LLMs) with the ReAct (Reasoning + Acting) framework, the system autonomously interprets building regulations, explores IFC (Industry Foundation Classes) building models, and generates specialized tools on-demand to verify compliance.</small>
 
-<small>**Key Innovation**: Instead of requiring pre-programmed rules for every regulation, the system uses an autonomous agent that can reason about requirements, discover what data it needs, select or create custom analysis tools, and adapt its strategy based on findings - all without human intervention.</small>
+<small><strong>Key Innovation</strong>: Instead of requiring pre-programmed rules for every regulation, the system uses an autonomous agent that can reason about requirements, discover what data it needs, select or create custom analysis tools, and adapt its strategy based on findings - all without human intervention.</small>
 
 ---
 
 <h4>System Architecture</h4>
 
 <p align="center">
-  <img src="images/architecture.png" alt="System Architecture" width="80%">
+  <img src="images/architecture.png" alt="System Architecture" width="100%">
 </p>
 
-<small>The system implements a **single-agent ReAct architecture** where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.</small>
+<small>The system implements a <strong>single-agent ReAct architecture</strong> where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.</small>
 
 <h5>Compliance Agent</h5>
 <small>Autonomous reasoning engine (`agents/compliance_agent.py`) that runs ReAct loops: Thought (analyze situation) → Action (select tool) → Observation (process result). Each iteration is logged in SharedContext for complete audit trail.</small>
 
-<h5>Agent Tools (7 tools)</h5>
-- <small>**Subgoal Management** (2): `generate_subgoals`, `review_and_update_subgoals` - Dynamic planning and progress tracking</small>
-- <small>**IFC Tool Lifecycle** (5): `select_ifc_tool`, `create_ifc_tool`, `execute_ifc_tool`, `fix_ifc_tool`, `store_ifc_tool` - Manage tool creation, testing, and persistence</small>
+<h5>Agent Tools </h5>
 
-<h5>IFC Tools (Hierarchical)</h5>
-- <small>**ifc_tool_utils**: Atomic operations (IfcOpenShell wrappers)</small>
-- <small>**Core Tools** (32 pre-built): Generic exploratory tools, quantification, aggregation, topological operations</small>
-- <small>**Generated Tools**: Domain-specific tools dynamically created by agent</small>
+- <small><strong>Subgoal Management</strong>: `generate_subgoals`, `review_and_update_subgoals` - Dynamic planning and progress tracking</small>
+- <small><strong>IFC Tool Lifecycle</strong>: `select_ifc_tool`, `create_ifc_tool`, `execute_ifc_tool`, `fix_ifc_tool`, `store_ifc_tool` - Manage tool creation, testing, and persistence</small>
 
-<h5>Global Components (Singleton Pattern)</h5>
-- <small>**SharedContext**: Global state management - stores session info, subgoals, agent history, search summaries, compliance results</small>
-- <small>**ToolRegistry**: Auto-discovery and schema generation for all tools</small>
-- <small>**VectorDatabase**: ChromaDB for semantic tool search</small>
+
+<h5>IFC Tools</h5>
+
+- <small><strong>ifc_tool_utils</strong>: Atomic operations (IfcOpenShell wrappers)</small>
+
+- <small><strong>Core Tools</strong> (20 pre-built): Generic exploratory tools, quantification, aggregation, topological operations</small>
+- <small><strong>Generated Tools</strong>: Domain-specific tools dynamically created by agent</small>
+
+<h5>Global Components</h5>
+
+- <small><strong>SharedContext</strong>: Global state management - stores session info, subgoals, agent history, search summaries, compliance results</small>
+- <small><strong>ToolRegistry</strong>: Auto-discovery and schema generation for all tools</small>
+- <small><strong>VectorDatabase</strong>: ChromaDB for semantic tool search</small>
 
 ---
 
 <h4>How It Works: Three-Phase Workflow</h4>
+<p align="center">
+  <img src="images/workflow.png" alt="workflow" width="100%">
+</p>
 
 <h5>Phase 1: Task Decomposition</h5>
-<small>The agent starts by interpret the regulation (use `search_and_summarize` when necessary), disambiguating technical terms to IFC concepts, then generating executable subgoals that follow a logical flow: Identification → Data Collection → Analysis → Verification.</small>
+<small>The agent starts by interpret the regulation, disambiguating technical terms to IFC concepts, then generating executable subgoals that follow a logical flow: Identification → Data Collection → Analysis → Verification.</small>
 
 <h5>Phase 2: Adaptive Execution</h5>
 <small>The agent executes subgoals using ReAct loops (Thought → Action → Observation). For each step, it searches for existing IFC tools and executes them. The agent can dynamically adjust its plan by reviewing progress and updating subgoals based on execution results.</small>
 
-**ReAct Example:**
-```
-THOUGHT: "I need to find all walls. Let me search for existing IFC tools."
-ACTION: select_ifc_tool(description="retrieve all wall elements")
-OBSERVATION: Found tool "get_elements_by_type"
-
-THOUGHT: "Perfect. I'll execute this tool."
-ACTION: execute_ifc_tool(tool_name="get_elements_by_type", parameters={"element_type": "IfcWall"})
-OBSERVATION: Success - Found 245 wall elements
-```
 
 <small>When no suitable tool exists, the agent creates one via `create_ifc_tool` → sandbox test with `execute_ifc_tool` → fix errors with `fix_ifc_tool` → persist with `store_ifc_tool`.</small>
 
-<h5>Phase 3: Result Generation</h5>
-<small>When the agent stops calling tools, the system automatically generates a compliance report with pass/fail status, evidence from successful tool executions, list of violations, and recommendations.</small>
+
 
 ---
 
