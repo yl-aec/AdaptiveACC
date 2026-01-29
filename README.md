@@ -17,7 +17,7 @@
 <h3>System Architecture</h3>
 
 <p align="center">
-  <img src="images/architecture.svg" alt="System Architecture" width="80%">
+  <img src="images/architecture.svg" alt="System Architecture" width="100%">
 </p>
 
 <small>The system implements a <strong>single-agent ReAct architecture</strong> where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.</small>
@@ -48,7 +48,7 @@
 
 <h3>How It Works: Three-Phase Workflow</h3>
 <p align="center">
-  <img src="images/workflow.svg" alt="workflow" width="80%">
+  <img src="images/workflow.svg" alt="workflow" width="100%">
 </p>
 
 <h4>Phase 1: Task Decomposition</h4>
@@ -69,34 +69,34 @@
 <table>
   <thead>
     <tr>
-      <th><small>Layer</small></th>
-      <th><small>Technologies</small></th>
+      <th><small><small>Layer</small></small></th>
+      <th><small><small>Technologies</small></small></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td><small><strong>AI/ML</strong></small></td>
-      <td><small>OpenAI GPT-4 / DeepSeek / <strong>Gemini</strong>, Instructor (structured outputs), ReAct framework</small></td>
+      <td><small><small><strong>AI/ML</strong></small></small></td>
+      <td><small><small>OpenAI GPT-4 / DeepSeek / <strong>Gemini</strong>, Instructor (structured outputs), ReAct framework</small></small></td>
     </tr>
     <tr>
-      <td><small><strong>Backend</strong></small></td>
-      <td><small>FastAPI, Pydantic models, Python 3.8+</small></td>
+      <td><small><small><strong>Backend</strong></small></small></td>
+      <td><small><small>FastAPI, Pydantic models, Python 3.8+</small></small></td>
     </tr>
     <tr>
-      <td><small><strong>BIM Processing</strong></small></td>
-      <td><small>IfcOpenShell</small></td>
+      <td><small><small><strong>BIM Processing</strong></small></small></td>
+      <td><small><small>IfcOpenShell</small></small></td>
     </tr>
     <tr>
-      <td><small><strong>Storage</strong></small></td>
-      <td><small>ChromaDB (vector database), File system (tool persistence)</small></td>
+      <td><small><small><strong>Storage</strong></small></small></td>
+      <td><small><small>ChromaDB (vector database), File system (tool persistence)</small></small></td>
     </tr>
     <tr>
-      <td><small><strong>Frontend</strong></small></td>
-      <td><small>Three.js (3D IFC visualization)</small></td>
+      <td><small><small><strong>Frontend</strong></small></small></td>
+      <td><small><small>Three.js (3D IFC visualization)</small></small></td>
     </tr>
     <tr>
-      <td><small><strong>Observability</strong></small></td>
-      <td><small>Phoenix (Arize) for distributed tracing, custom execution logging</small></td>
+      <td><small><small><strong>Observability</strong></small></small></td>
+      <td><small><small>Phoenix (Arize) for distributed tracing, custom execution logging</small></small></td>
     </tr>
   </tbody>
 </table>
