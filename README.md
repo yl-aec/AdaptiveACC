@@ -1,54 +1,53 @@
 
-
-> An AI-powered system that autonomously verifies building designs against regulatory codes using agentic AI and dynamic tool generation.
+> <small>An AI-powered system that autonomously verifies building designs against regulatory codes using agentic AI and dynamic tool generation.</small>
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/blau1234/AdaptiveACC)
 
 
-## Overview
+<h4>Overview</h4>
 
-The ACC System transforms building code compliance checking from a manual, time-consuming process into an automated workflow powered by agentic AI. By leveraging Large Language Models (LLMs) with the ReAct (Reasoning + Acting) framework, the system autonomously interprets building regulations, explores IFC (Industry Foundation Classes) building models, and generates specialized tools on-demand to verify compliance.
+<small>The ACC System transforms building code compliance checking from a manual, time-consuming process into an automated workflow powered by agentic AI. By leveraging Large Language Models (LLMs) with the ReAct (Reasoning + Acting) framework, the system autonomously interprets building regulations, explores IFC (Industry Foundation Classes) building models, and generates specialized tools on-demand to verify compliance.</small>
 
-**Key Innovation**: Instead of requiring pre-programmed rules for every regulation, the system uses an autonomous agent that can reason about requirements, discover what data it needs, select or create custom analysis tools, and adapt its strategy based on findings - all without human intervention.
+<small>**Key Innovation**: Instead of requiring pre-programmed rules for every regulation, the system uses an autonomous agent that can reason about requirements, discover what data it needs, select or create custom analysis tools, and adapt its strategy based on findings - all without human intervention.</small>
 
 ---
 
-## System Architecture
+<h4>System Architecture</h4>
 
 <p align="center">
   <img src="images/architecture.png" alt="System Architecture" width="80%">
 </p>
 
-The system implements a **single-agent ReAct architecture** where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.
+<small>The system implements a **single-agent ReAct architecture** where one autonomous agent orchestrates the entire compliance checking workflow by dynamically selecting and invoking specialized tools. The agent maintains global state through a shared context and can create new tools on-demand when existing capabilities are insufficient.</small>
 
-### Compliance Agent
-Autonomous reasoning engine (`agents/compliance_agent.py`) that runs ReAct loops: Thought (analyze situation) → Action (select tool) → Observation (process result). Each iteration is logged in SharedContext for complete audit trail.
+<h5>Compliance Agent</h5>
+<small>Autonomous reasoning engine (`agents/compliance_agent.py`) that runs ReAct loops: Thought (analyze situation) → Action (select tool) → Observation (process result). Each iteration is logged in SharedContext for complete audit trail.</small>
 
-### Agent Tools (7 tools)
-- **Subgoal Management** (2): `generate_subgoals`, `review_and_update_subgoals` - Dynamic planning and progress tracking
-- **IFC Tool Lifecycle** (5): `select_ifc_tool`, `create_ifc_tool`, `execute_ifc_tool`, `fix_ifc_tool`, `store_ifc_tool` - Manage tool creation, testing, and persistence
+<h5>Agent Tools (7 tools)</h5>
+- <small>**Subgoal Management** (2): `generate_subgoals`, `review_and_update_subgoals` - Dynamic planning and progress tracking</small>
+- <small>**IFC Tool Lifecycle** (5): `select_ifc_tool`, `create_ifc_tool`, `execute_ifc_tool`, `fix_ifc_tool`, `store_ifc_tool` - Manage tool creation, testing, and persistence</small>
 
-### IFC Tools (Hierarchical)
-- **ifc_tool_utils**: Atomic operations (IfcOpenShell wrappers)
-- **Core Tools** (32 pre-built): Generic exploratory tools, quantification, aggregation, topological operations
-- **Generated Tools**: Domain-specific tools dynamically created by agent
+<h5>IFC Tools (Hierarchical)</h5>
+- <small>**ifc_tool_utils**: Atomic operations (IfcOpenShell wrappers)</small>
+- <small>**Core Tools** (32 pre-built): Generic exploratory tools, quantification, aggregation, topological operations</small>
+- <small>**Generated Tools**: Domain-specific tools dynamically created by agent</small>
 
-### Global Components (Singleton Pattern)
-- **SharedContext**: Global state management - stores session info, subgoals, agent history, search summaries, compliance results
-- **ToolRegistry**: Auto-discovery and schema generation for all tools
-- **VectorDatabase**: ChromaDB for semantic tool search
+<h5>Global Components (Singleton Pattern)</h5>
+- <small>**SharedContext**: Global state management - stores session info, subgoals, agent history, search summaries, compliance results</small>
+- <small>**ToolRegistry**: Auto-discovery and schema generation for all tools</small>
+- <small>**VectorDatabase**: ChromaDB for semantic tool search</small>
 
 ---
 
-## How It Works: Three-Phase Workflow
+<h4>How It Works: Three-Phase Workflow</h4>
 
-### Phase 1: Task Decomposition
-The agent starts by interpret the regulation (use `search_and_summarize` when necessary), disambiguating technical terms to IFC concepts, then generating executable subgoals that follow a logical flow: Identification → Data Collection → Analysis → Verification.
+<h5>Phase 1: Task Decomposition</h5>
+<small>The agent starts by interpret the regulation (use `search_and_summarize` when necessary), disambiguating technical terms to IFC concepts, then generating executable subgoals that follow a logical flow: Identification → Data Collection → Analysis → Verification.</small>
 
-### Phase 2: Adaptive Execution
-The agent executes subgoals using ReAct loops (Thought → Action → Observation). For each step, it searches for existing IFC tools and executes them. The agent can dynamically adjust its plan by reviewing progress and updating subgoals based on execution results.
+<h5>Phase 2: Adaptive Execution</h5>
+<small>The agent executes subgoals using ReAct loops (Thought → Action → Observation). For each step, it searches for existing IFC tools and executes them. The agent can dynamically adjust its plan by reviewing progress and updating subgoals based on execution results.</small>
 
 **ReAct Example:**
 ```
@@ -61,34 +60,62 @@ ACTION: execute_ifc_tool(tool_name="get_elements_by_type", parameters={"element_
 OBSERVATION: Success - Found 245 wall elements
 ```
 
-When no suitable tool exists, the agent creates one via `create_ifc_tool` → sandbox test with `execute_ifc_tool` → fix errors with `fix_ifc_tool` → persist with `store_ifc_tool`.
+<small>When no suitable tool exists, the agent creates one via `create_ifc_tool` → sandbox test with `execute_ifc_tool` → fix errors with `fix_ifc_tool` → persist with `store_ifc_tool`.</small>
 
-### Phase 3: Result Generation
-When the agent stops calling tools, the system automatically generates a compliance report with pass/fail status, evidence from successful tool executions, list of violations, and recommendations.
-
----
-
-## Technical Stack
-
-| Layer | Technologies |
-|-------|-------------|
-| **AI/ML** | OpenAI GPT-4 / DeepSeek / **Gemini**, Instructor (structured outputs), ReAct framework |
-| **Backend** | FastAPI, Pydantic models, Python 3.8+ |
-| **BIM Processing** | IfcOpenShell |
-| **Storage** | ChromaDB (vector database), File system (tool persistence) |
-| **Frontend** | Three.js (3D IFC visualization) |
-| **Observability** | Phoenix (Arize) for distributed tracing, custom execution logging |
+<h5>Phase 3: Result Generation</h5>
+<small>When the agent stops calling tools, the system automatically generates a compliance report with pass/fail status, evidence from successful tool executions, list of violations, and recommendations.</small>
 
 ---
 
-## Quick Start
+<h4>Technical Stack</h4>
 
-### Prerequisites
+<small>
+<table>
+  <thead>
+    <tr>
+      <th>Layer</th>
+      <th>Technologies</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>AI/ML</strong></td>
+      <td>OpenAI GPT-4 / DeepSeek / <strong>Gemini</strong>, Instructor (structured outputs), ReAct framework</td>
+    </tr>
+    <tr>
+      <td><strong>Backend</strong></td>
+      <td>FastAPI, Pydantic models, Python 3.8+</td>
+    </tr>
+    <tr>
+      <td><strong>BIM Processing</strong></td>
+      <td>IfcOpenShell</td>
+    </tr>
+    <tr>
+      <td><strong>Storage</strong></td>
+      <td>ChromaDB (vector database), File system (tool persistence)</td>
+    </tr>
+    <tr>
+      <td><strong>Frontend</strong></td>
+      <td>Three.js (3D IFC visualization)</td>
+    </tr>
+    <tr>
+      <td><strong>Observability</strong></td>
+      <td>Phoenix (Arize) for distributed tracing, custom execution logging</td>
+    </tr>
+  </tbody>
+</table>
+</small>
 
-- Python 3.8+
-- Node.js 16+ (optional, for frontend development)
+---
 
-### Installation
+<h4>Quick Start</h4>
+
+<h5>Prerequisites</h5>
+
+- <small>Python 3.8+</small>
+- <small>Node.js 16+ (optional, for frontend development)</small>
+
+<h5>Installation</h5>
 
 ```bash
 
@@ -105,9 +132,9 @@ cp .env.example .env
 # For Gemini API setup, see GEMINI_SETUP_GUIDE.md
 ```
 
-### Build Frontend (Optional)
+<h5>Build Frontend (Optional)</h5>
 
-If you want to use the 3D IFC viewer interface:
+<small>If you want to use the 3D IFC viewer interface:</small>
 
 ```bash
 cd frontend
@@ -116,9 +143,9 @@ npm run build
 cd ..
 ```
 
-This builds the Three.js-based frontend and outputs to `templates/`. Skip this if you only need API access.
+<small>This builds the Three.js-based frontend and outputs to `templates/`. Skip this if you only need API access.</small>
 
-### Run the System
+<h5>Run the System</h5>
 
 ```bash
 # Start FastAPI server
