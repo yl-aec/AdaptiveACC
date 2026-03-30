@@ -15,7 +15,7 @@
 <h3>User Interface and Checking Process</h3>
 
 <p align="center">
-  <img src="images/interface.png" alt="User Interface and Checking Process" width="800%">
+  <img src="images/interface.svg" alt="User Interface and Checking Process" width="800%">
 </p>
 
 ---
