@@ -12,6 +12,12 @@
 
 <small><strong>Key Innovation</strong>: Instead of requiring pre-programmed rules for every regulation, the system uses an autonomous agent that can reason about requirements, discover what data it needs, select or create custom analysis tools, and adapt its strategy based on findings - all without human intervention.</small>
 
+<h3>User Interface and Checking Process</h3>
+
+<p align="center">
+  <img src="images/interface.png" alt="User Interface and Checking Process" width="800%">
+</p>
+
 ---
 
 <h3>System Architecture</h3>
